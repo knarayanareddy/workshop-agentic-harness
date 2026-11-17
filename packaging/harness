@@ -1,0 +1,21 @@
+#!/bin/sh
+# Starts the harness with the Java runtime bundled next to this script; no JDK needed.
+# Usage: ./harness [path/to/project]
+# Default project: the repository's workspace/ when this package was built into <repo>/agentic-harness/,
+# otherwise the workspace/ folder next to this script.
+here="$(cd "$(dirname "$0")" && pwd)"
+
+# extensions/ resolves from the working directory, so run from here;
+# make a project path absolute first, so it still points where the user meant.
+if [ $# -gt 0 ]; then
+    project="$(cd "$1" && pwd)" || exit 1
+    set -- "$project"
+elif [ "$(basename "$(dirname "$here")")" = agentic-harness ] && [ -d "$here/../../workspace" ]; then
+    set -- "$(cd "$here/../../workspace" && pwd)"
+fi
+cd "$here" || exit 1
+
+# The macOS runtime keeps its Java home under Contents/Home.
+if [ -d "$here/runtime/Contents/Home" ]; then JAVA_HOME="$here/runtime/Contents/Home"; else JAVA_HOME="$here/runtime"; fi
+export JAVA_HOME
+exec "$here/app/bin/app" "$@"

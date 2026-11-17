@@ -1,0 +1,26 @@
+# Build output
+.gradle/
+.kotlin/
+build/
+node_modules/
+dist/
+
+# IDE and OS files
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# The agent's sandbox: only the README and the OpenRA toolbox are committed
+workspace/*
+!workspace/README.md
+!workspace/docker/
+
+# Standalone harness packages (docker build --output . .)
+agentic-harness/
+
+# Session reports written by /report
+reports/
+
+# Local secrets
+.env

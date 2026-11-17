@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Build your own agentic harness</title>
+<!--
+  reveal.js 5.1.0, vendored in ./revealjs: open this file by double-clicking, no server or internet needed.
+  Keys: arrows = navigate, S = speaker notes (timing is in them), O = overview, F = fullscreen, ?print-pdf = PDF export.
+  Outline: opening, harness, context, loop, workshop map, system prompt, tools, guardrails, skills, get started. Code excerpts are from this repository.
+-->
+<link rel="stylesheet" href="revealjs/reset.min.css">
+<link rel="stylesheet" href="revealjs/reveal.min.css">
+<link rel="stylesheet" href="revealjs/theme/white.min.css">
+<style>
+/* Design tokens: identical to workshop.html */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --surface-2: #f3f1ec; --text: #1f2328; --muted: #5f6670;
+  --border: #e3e0d8; --accent: #c2410c; --accent-soft: #fff1e8; --code-bg: #f5f3ee;
+  --ok: #15803d; --ok-soft: #ecfdf3; --info: #1d4ed8; --info-soft: #eef4ff;
+  --warn: #a16207; --warn-soft: #fff8e6; --bad: #b91c1c; --bad-soft: #fef2f2;
+  --hl-keyword: #a626a4; --hl-string: #15803d; --hl-number: #b45309; --hl-title: #1d4ed8; --hl-comment: #8a9099;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a; --surface: #1c1f23; --surface-2: #23272c; --text: #e6e6e3; --muted: #9aa1a9;
+    --border: #2f343a; --accent: #fb923c; --accent-soft: #2b1d14; --code-bg: #111315;
+    --ok: #4ade80; --ok-soft: #12261a; --info: #93b4ff; --info-soft: #161f33;
+    --warn: #facc15; --warn-soft: #2a2412; --bad: #f87171; --bad-soft: #2b1616;
+    --hl-keyword: #d19bf0; --hl-string: #86efac; --hl-number: #fbbf24; --hl-title: #93b4ff; --hl-comment: #7d848c;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171a; --surface: #1c1f23; --surface-2: #23272c; --text: #e6e6e3; --muted: #9aa1a9;
+  --border: #2f343a; --accent: #fb923c; --accent-soft: #2b1d14; --code-bg: #111315;
+  --ok: #4ade80; --ok-soft: #12261a; --info: #93b4ff; --info-soft: #161f33;
+  --warn: #facc15; --warn-soft: #2a2412; --bad: #f87171; --bad-soft: #2b1616;
+  --hl-keyword: #d19bf0; --hl-string: #86efac; --hl-number: #fbbf24; --hl-title: #93b4ff; --hl-comment: #7d848c;
+  --shadow: none;
+}
+:root {
+  --r-background-color: var(--bg); --r-main-color: var(--text); --r-heading-color: var(--text);
+  --r-link-color: var(--accent); --r-link-color-hover: var(--accent); --r-link-color-dark: var(--accent);
+  --r-selection-background-color: var(--accent); --r-selection-color: #fff;
+  --r-main-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-heading-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-heading-font-weight: 700; --r-heading-text-transform: none; --r-heading-letter-spacing: -.02em;
+  --r-code-font: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+html, body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+.reveal { font-size: 34px; line-height: 1.5; }
+.reveal h1, .reveal h2, .reveal h3 { text-transform: none; line-height: 1.15; }
+.reveal h1 { font-size: 2.2em; letter-spacing: -.02em; } .reveal h2 { font-size: 1.5em; letter-spacing: -.01em; }
+.reveal section { text-align: left; }
+.reveal .eyebrow { display: block; font-size: .42em; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .4em; }
+.reveal .sub { color: var(--muted); font-size: .72em; }
+.reveal .center { text-align: center; }
+.reveal ul { display: block; } .reveal li { margin: .35em 0; }
+.reveal li::marker { color: var(--accent); }
+
+/* Code: light blocks with a border, like the worksheet */
+.reveal pre { width: 100%; box-shadow: none; font-size: .64em; line-height: 1.5; margin: .5em 0;
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; }
+.reveal pre code { max-height: 560px; padding: .9em 1.1em; background: transparent; color: var(--text); }
+.reveal code:not(pre code) { background: var(--code-bg); border: 1px solid var(--border); color: var(--text); padding: .05em .3em; border-radius: 4px; font-size: .85em; }
+.hljs { color: var(--text); background: transparent; }
+html:not(.print-pdf) .reveal pre code.hljs { font-size: inherit; } /* reveal pins highlighted code to 15pt */
+.hljs-keyword, .hljs-built_in, .hljs-literal, .hljs-meta { color: var(--hl-keyword); }
+.hljs-string, .hljs-subst, .hljs-template-variable { color: var(--hl-string); }
+.hljs-number, .hljs-symbol { color: var(--hl-number); }
+.hljs-title, .hljs-title.class_, .hljs-title.function_, .hljs-type, .hljs-class .hljs-title { color: var(--hl-title); }
+.hljs-comment, .hljs-quote { color: var(--hl-comment); font-style: italic; }
+.hljs-attr, .hljs-variable, .hljs-property, .hljs-params { color: var(--text); }
+
+.reveal .big { font-size: 1.5em; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; }
+.reveal .punch { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 8px; padding: .4em .8em; font-weight: 700; font-size: 1.05em; margin-top: .8em; }
+.reveal .grid { display: grid; gap: .6em; margin-top: .6em; }
+.reveal .g2 { grid-template-columns: 1fr 1fr; } .reveal .g3 { grid-template-columns: repeat(3, 1fr); } .reveal .g4 { grid-template-columns: repeat(4, 1fr); }
+.reveal .card { border: 1px solid var(--border); border-radius: 10px; padding: .6em .8em; background: var(--surface); box-shadow: var(--shadow); font-size: .8em; }
+.reveal .card b { display: block; font-size: 1.05em; margin-bottom: .1em; }
+.reveal .card.hot { border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.reveal .card.ok { border-left: 3px solid var(--ok); background: var(--ok-soft); }
+.reveal .card.info { border-left: 3px solid var(--info); background: var(--info-soft); }
+.reveal .card.bad { border-left: 3px solid var(--bad); background: var(--bad-soft); }
+.reveal .card .sub { font-size: .85em; }
+.reveal .tag { display: inline-block; font-size: .55em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .1em .7em; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.reveal table { font-size: .84em; margin: .6em 0; border-collapse: collapse; }
+.reveal table th { text-transform: uppercase; font-size: .7em; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+.reveal table td, .reveal table th { padding: .4em .8em; border-bottom: 1px solid var(--border); }
+.reveal pre table { font-size: inherit; margin: 0; } .reveal pre table td { border: 0; } /* line-numbered code is a table too */
+.reveal .flow { display: flex; align-items: center; justify-content: center; gap: .5em; margin: .8em 0; flex-wrap: wrap; }
+.reveal .node { border: 1px solid var(--border); border-radius: 8px; padding: .35em .75em; font-size: .6em; font-weight: 600; background: var(--surface); box-shadow: var(--shadow); text-align: center; font-family: var(--r-code-font); }
+.reveal .node.model { border-color: var(--accent); background: var(--accent-soft); } .reveal .node.tool { border-color: var(--ok); background: var(--ok-soft); }
+.reveal .node.hook { border: 1px dashed var(--info); background: var(--info-soft); } .reveal .node small { display: block; font-size: .65em; color: var(--muted); font-weight: 500; }
+.reveal .arrow { color: var(--muted); font-size: .8em; }
+.reveal .lane { border: 1px solid var(--border); border-radius: 10px; padding: .5em .7em; background: var(--surface-2); }
+.reveal .lane h4 { margin: 0 0 .3em; font-size: .45em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.reveal .lane .flow { margin: .3em 0; }
+.reveal .meter { display: flex; height: 2.2em; border-radius: 8px; overflow: hidden; font-size: .55em; font-weight: 700; color: #fff; margin: .5em 0; }
+.reveal .meter span { display: flex; align-items: center; justify-content: center; }
+.reveal .ask { font-size: .55em; color: var(--muted); margin: 0 0 .6em; } .reveal .ask q { color: var(--accent); font-weight: 700; quotes: "\201C" "\201D"; } .reveal .ask q + q { margin-left: .4em; }
+.reveal .x { color: var(--bad); } .reveal .v { color: var(--ok); }
+
+.reveal .step { display: inline-flex; width: 1.6em; height: 1.6em; border-radius: 50%; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-weight: 700; font-size: .8em; margin-bottom: .3em; }
+.reveal .card code { display: block; width: fit-content; margin: .2em 0; font-size: .75em; }
+.reveal .card .asg { display: block; margin-top: .4em; font-size: .7em; font-weight: 700; color: var(--accent); }
+.reveal .ws { margin-top: 1em; padding-top: .5em; border-top: 1px solid var(--border); font-size: .55em; color: var(--muted); }
+.reveal .ws b { color: var(--accent); margin-right: .4em; }
+.reveal .qr { text-align: center; } .reveal .qr svg { width: 100%; max-width: 230px; display: block; margin: 0 auto .3em; border-radius: 8px; }
+
+/* Top bar: same logo and brand as the worksheet */
+.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); border-bottom: 1px solid var(--border);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); }
+.topbar .logo { height: 40px; width: auto; display: block; color: var(--text); }
+.topbar .brand { padding-left: 12px; border-left: 1px solid var(--border); line-height: 24px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.topbar .brand span { color: var(--accent); }
+.topbar .spacer { flex: 1; }
+.topbar .icon-btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.reveal .controls, .reveal .progress { color: var(--accent); }
+.reveal .slide-number { background: transparent; color: var(--muted); font: 13px system-ui, sans-serif; }
+.reveal { margin-top: 56px; height: calc(100% - 56px); } /* deck starts below the top bar */
+@media print { .topbar { display: none; } .reveal { margin-top: 0; height: 100%; } }
+</style>
+</head>
+<body>
+<header class="topbar"><svg class="logo" viewBox="0 0 368.12799 176.784" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JDriven"><clipPath id="jd-a"><path d="m0 132.588h276.096v-132.588h-276.096z"/></clipPath><clipPath id="jd-b"><path d="m0 132.588h276.096v-132.588h-276.096z"/></clipPath><g transform="matrix(1.3333333 0 0 -1.3333333 0 176.784)"><path d="m0 0h276.096v132.588h-276.096z" fill="#ffffff" fill-opacity="0"/><g clip-path="url(#jd-a)" fill="currentColor"><path d="m0 0c-1.464.806-2.61 1.919-3.44 3.336-.829 1.418-1.245 3.025-1.245 4.823s.416 3.405 1.245 4.822c.83 1.418 1.976 2.525 3.44 3.32s3.13 1.192 4.996 1.192c1.66 0 3.14-.333 4.442-1.002s2.311-1.637 3.026-2.904l-2.524-1.625c-.577.876-1.291 1.532-2.144 1.97-.852.438-1.797.658-2.835.658-1.198 0-2.276-.266-3.232-.795-.957-.531-1.705-1.286-2.248-2.265-.541-.98-.812-2.104-.812-3.371 0-1.291.271-2.426.812-3.405.543-.98 1.291-1.735 2.248-2.265.956-.53 2.034-.795 3.232-.795 1.038 0 1.983.219 2.835.657.853.437 1.567 1.095 2.144 1.971l2.524-1.591c-.715-1.268-1.724-2.242-3.026-2.921-1.302-.68-2.782-1.02-4.442-1.02-1.866 0-3.532.403-4.996 1.21" transform="translate(146.5063 10.6208)"/><path d="m0 0c-1.452.806-2.587 1.919-3.405 3.336-.819 1.418-1.228 3.025-1.228 4.823s.409 3.405 1.228 4.822c.818 1.418 1.953 2.525 3.405 3.32s3.088 1.192 4.91 1.192c1.82 0 3.451-.397 4.891-1.192 1.441-.795 2.57-1.902 3.389-3.32.818-1.417 1.226-3.024 1.226-4.822s-.408-3.405-1.226-4.823c-.819-1.417-1.948-2.53-3.389-3.336-1.44-.807-3.071-1.21-4.891-1.21-1.822 0-3.458.403-4.91 1.21m8.073 2.507c.933.541 1.665 1.302 2.195 2.282.53.979.796 2.102.796 3.37 0 1.267-.266 2.391-.796 3.371-.53.979-1.262 1.734-2.195 2.265-.934.529-1.988.795-3.163.795-1.176 0-2.231-.266-3.164-.795-.934-.531-1.671-1.286-2.213-2.265-.541-.98-.812-2.104-.812-3.371 0-1.268.271-2.391.812-3.37.542-.98 1.279-1.741 2.213-2.282.933-.542 1.988-.813 3.164-.813 1.175 0 2.229.271 3.163.813" transform="translate(165.9186 10.6208)"/><path d="m0 0c1.371-1.348 2.058-3.326 2.058-5.929v-10.545h-3.319v10.164c0 1.775-.427 3.112-1.279 4.011-.853.899-2.075 1.348-3.665 1.348-1.798 0-3.217-.524-4.253-1.573-1.037-1.049-1.555-2.553-1.555-4.512v-9.438h-3.319v18.323h3.18v-2.765c.669.944 1.573 1.67 2.714 2.177 1.14.508 2.438.761 3.889.761 2.328 0 4.178-.674 5.549-2.022" transform="translate(199.3052 26.0922)"/><path d="m0 0c.668.702 1.602 1.054 2.8 1.054h1.451v2.801h-1.451v-.002c-2.175-.007-3.902-.651-5.185-1.934-1.292-1.292-1.938-3.089-1.938-5.394v-3.529h-3.11v-2.732h3.11v-15.592h3.32v15.592h5.254v2.732h-5.254v3.91c0 1.359.335 2.391 1.003 3.094" transform="translate(212.3221 34.9461)"/><path d="m223.17 9.618h-3.319v29.182h3.319z"/><path d="m0 0v-18.324h-3.145v2.766c-.669-.945-1.55-1.677-2.645-2.195-1.095-.519-2.289-.778-3.579-.778-2.442 0-4.367.675-5.773 2.022-1.406 1.349-2.11 3.337-2.11 5.964v10.545h3.32v-10.164c0-1.776.427-3.118 1.279-4.028.852-.911 2.074-1.366 3.664-1.366 1.752 0 3.136.53 4.149 1.591 1.014 1.059 1.521 2.558 1.521 4.494v9.473z" transform="translate(244.2194 27.9417)"/><path d="m0 0-5.289 7.018-5.359-7.018h-3.699l7.226 9.369-6.881 8.955h3.699l5.048-6.604 5.014 6.604h3.63l-6.915-8.955 7.295-9.369z" transform="translate(262.2312 9.6181)"/><path d="m226.968 38.801h39.032v-1.659h-39.032z"/><path d="m105.543 38.801h95.821v-1.659h-95.821z"/></g><g clip-path="url(#jd-b)" fill="#18c652"><path d="m0 0c.034-6.23.102-18.929.102-20.174 0-1.656-4.118-.726-4.118-.726v-6.219s1.777-1.373 5.492-1.373c3.714 0 7.228 3.068 7.228 6.058v26.719z" transform="translate(90.7152 65.6699)"/><path d="m0 0c0 3.95-2.798 7.154-6.252 7.154-3.452 0-6.251-3.204-6.251-7.154s2.799-7.154 6.251-7.154c3.454 0 6.252 3.204 6.252 7.154m-8.432-14.417c-6.958 0-12.599 6.456-12.599 14.417 0 7.962 5.641 14.417 12.599 14.417s12.599-6.455 12.599-14.417c0-7.961-5.641-14.417-12.599-14.417" transform="translate(125.9029 62.9019)"/><path d="m0 0v-33.62h7.996v37.556z" transform="translate(126.0724 83.0747)"/><path d="m149.818 49.454h-7.996v26.895h7.996z"/><path d="m0 0c-4.705 3.553-10.922-3.119-11.025-4.512-.121-1.656.122 7.177 0 8.025 2.05 3.101 4.866 5.098 11.025 5.098z" transform="translate(160.2971 68.2325)"/><path d="m172.594 49.454h-7.996v26.895h7.996z"/><path d="m0 0c0-3.011-2.441-5.452-5.452-5.452-3.01 0-5.451 2.441-5.451 5.452s2.441 5.452 5.451 5.452c3.011 0 5.452-2.441 5.452-5.452" transform="translate(174.0475 84.5877)"/><path d="m0 0h8.602l6.421-15.992 6.663 15.992h7.996l-11.267-26.411h-6.785z" transform="translate(176.9551 76.1072)"/><path d="m0 0h10.694s.276 5.452-5.346 5.452c-5.623 0-5.348-5.452-5.348-5.452m18.73-2.676c0-.529.006-1.635-.047-2.15h-18.685c0-3.15.408-6.179 5.375-6.179s5.391 3.315 5.391 3.315l7.632-.029c-1.83-5.652-6.924-9.222-13.023-9.222-7.628 0-13.811 6.374-13.811 14.235s6.183 14.235 13.811 14.235 13.357-6.343 13.357-14.205" transform="translate(215.6198 65.6079)"/><path d="m0 0s.02 2.926.02 14.679c0 10.784-9.505 2.807-9.626 1.151s.156 6.098.035 6.946c4.725 7.148 18.173 5.815 18.173-2.786v-19.99z" transform="translate(257.3984 49.4544)"/><path d="m248.191 49.454h-7.996v26.895h7.996z"/><path d="m0 0 86.282-27.54-48.632-3.661z" transform="translate(12.266 122.5879)"/><path d="m0 0-66.585-55.081 19.348 45.494z" transform="translate(99.4194 92.2585)"/><path d="m0 0-20.045 82.273 33.467-35.559z" transform="translate(30.0453 38.3977)"/></g></g></svg><div class="brand">Agentic <span>Harness</span> <small style="font-weight:400;color:var(--muted)">workshop</small></div><div class="spacer"></div><button class="icon-btn" id="themeBtn" aria-label="Toggle theme">&#9680;</button></header>
+<div class="reveal"><div class="slides">
+
+<!-- 0 · Opening -->
+<section>
+  <section>
+    <span class="eyebrow">Agentic Harness Workshop</span>
+    <h1>Build your own<br>agentic harness</h1>
+    <p class="sub">and teach it to mod Red Alert</p>
+    <aside class="notes">About 25 minutes until people start, including the live demo.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">Today</span>
+    <h2>How this workshop works</h2>
+    <div class="grid g3">
+      <div class="card"><span class="step">1</span><b>Talk</b><span class="sub">What a harness is, the agentic loop and where you extend it.</span></div>
+      <div class="card"><span class="step">2</span><b>Together</b><span class="sub">Connect your harness. I do assignment 1.1 live.</span></div>
+      <div class="card hot"><span class="step">3</span><b>You build</b><span class="sub">Assignments 1 to 6 in <code>workshop.html</code>. Everything is prepared; hints walk you through each step.</span></div>
+    </div>
+    <p class="punch">Start the first build now: it downloads a lot.<br><code>./gradlew build</code></p>
+    <aside class="notes">~1 min. Set expectations: a short talk, then a lot of hands-on. They will not be thrown in the deep end: every assignment has step-by-step hints and a folded-away solution. QR code for the repository is on the get-started slide; show it now as well if people have not cloned yet.</aside>
+  </section>
+</section>
+
+<!-- 1 · What is a harness, and why build your own -->
+<section>
+  <section>
+    <span class="eyebrow">1 · What's an LLM?</span>
+    <h2>A model: text in, text out</h2>
+    <div class="flow">
+      <div class="node">prompt<small>text</small></div><span class="arrow">&rarr;</span>
+      <div class="node model">LLM<small>one inference call</small></div><span class="arrow">&rarr;</span>
+      <div class="node">completion<small>text</small></div>
+    </div>
+    <ul class="sub">
+      <li>Remembers nothing between calls</li>
+      <li>Cannot read your files or run anything</li>
+      <li>Only predicts the next tokens</li>
+    </ul>
+    <aside class="notes">~1 min. Keep it short. The model is a function from text to text. Everything it knows about your situation has to be in the prompt, every single call.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">1 · What's a harness?</span>
+    <h2>The program around the model</h2>
+    <div class="grid" style="grid-template-columns:1fr 2fr;align-items:center">
+      <div class="center"><img src="docock.jpeg" alt="Doc Ock with his mechanical arms, from Spider-Man 2" style="max-height:420px;border-radius:10px;border:1px solid var(--border)"><p class="sub" style="margin:.3em 0 0;font-size:.5em">Doc Ock: a brain with arms that do the work</p></div>
+      <div class="lane"><h4>Harness</h4>
+        <div class="grid g2" style="margin-top:0">
+          <div class="card"><b>The loop</b><span class="sub">calls the model until it is done</span></div>
+          <div class="card"><b>System prompt</b><span class="sub">what the model always sees</span></div>
+          <div class="card ok"><b>Tools</b><span class="sub">what it can look up and do</span></div>
+          <div class="card info"><b>Guardrails</b><span class="sub">what it may not do</span></div>
+        </div></div>
+    </div>
+    <p class="punch">Claude Code is a harness. So are Copilot's agent mode and Cursor.</p>
+    <aside class="notes">~1 min. Doc Ock: the harness is the arms and the control around the brain. The model alone only produces text; the harness gives it hands (tools), a memory (the messages it resends), a job description (system prompt) and limits (guardrails). Everyone in the room has used one; today you build one.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">1 · What's an agent?</span>
+    <h2>An agent is a running application</h2>
+    <div class="flow">
+      <div class="node model">LLM<small>decides</small></div><span class="arrow">+</span>
+      <div class="node tool">Harness<small>acts and controls</small></div><span class="arrow">=</span>
+      <div class="node" style="border-color:var(--accent);border-width:2px">Agent<small>a process that is running</small></div>
+    </div>
+    <p class="punch">The agent is a model interacting with the real world through a harness.</p>
+    <aside class="notes">~1 min. Stress that an agent is not a model or a file; it is an application that is running, like any other program. It starts, holds state (the messages), calls the model in a loop, runs tools, and stops. An LLM alone is a function; a harness that is not running does nothing. The loop itself comes back in section 3.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">1 · Why build your own harness</span>
+    <h2>Why not just use Claude Code?</h2>
+    <p class="sub" style="margin:0">A generic harness is built for every project. Your own gives you control of:</p>
+    <div class="grid g2">
+      <div class="card hot"><b>What the agent knows</b></div>
+      <div class="card hot"><b>How the agent behaves</b></div>
+      <div class="card hot"><b>How the agent gathers information and executes actions</b></div>
+      <div class="card hot"><b>What the agent shouldn't do</b></div>
+    </div>
+    <aside class="notes">~2 min. Claude Code is excellent, and you can extend it (CLAUDE.md, skills, hooks), but only at the points it offers. In your own harness every point is yours. And building one is the fastest way to understand what any agent does under the hood. Context: what the model sees. Behavior: how the agent acts. Information and actions: what it can read and do. Guardrails: what is blocked, gated or enforced.</aside>
+  </section>
+</section>
+
+<!-- 2 · Context engineering -->
+<section>
+  <section>
+    <span class="eyebrow">2 · Context engineering</span>
+    <h2>You know your context<br>better than a generic agent</h2>
+    <p class="punch">Share that knowledge.</p>
+    <aside class="notes">~2 min. The model is stateless: every call re-sends the whole context, and every call pays for it. The question is what the model should see now. Examples: project conventions, which files matter, which commands are safe.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">2 · Context engineering</span>
+    <h2>Change the system prompt</h2>
+    <pre><code class="language-plaintext" data-trim>This band writes chords as Nashville numbers (1 4 5 6m),
+never as chord names.
+We tune to A = 432 Hz. Never suggest autotune.</code></pre>
+    <p class="sub">Band conventions a generic agent cannot know.</p>
+    <aside class="notes">Exotic but realistic: Nashville numbering and a 432 Hz tuning are house rules. Only you know them. A system prompt section is the cheapest place for such knowledge, but it is advisory: the model can still ignore it.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">2 · Context engineering</span>
+    <h2>Offer useful tools</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="2-6|9-10|11-13">object ChordsInKey : Tool {
+    override val name = "chords_in_key"
+    override val description = "Diatonic chords of a key. mode: major or minor."
+    override val inputSchema = JsonSchema.obj()
+        .string("key", "Root note, e.g. C or F#")
+        .string("mode", "major or minor").build()
+
+    override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
+        val root = NOTES.indexOf(input.string("key"))
+        if (root < 0) return ToolOutcome.Failure("Unknown key. Try: $NOTES")
+        val scale = if (input.string("mode") == "major") MAJOR else MINOR
+        val chords = scale.map { (s, k) -> NOTES[(root + s) % 12] + k }
+        return ToolOutcome.Success(chords.joinToString(" | "))
+    }
+}</code></pre>
+    <p class="sub">C major: C | Dm | Em | F | G | Am | Bdim. The theory is code; the model only decides when to call it.</p>
+    <aside class="notes">A generic model often gets chords wrong, especially in less common keys. The tool holds the theory as code: deterministic and cheap; the model only decides when to call it. Input: key and mode (major or minor). An unknown key returns a Failure, which the model reads and corrects. NOTES, MAJOR and MINOR are constants left out of the slide; MAJOR and MINOR are (step, chord kind) pairs.</aside>
+  </section>
+</section>
+
+<!-- 3 · Agentic loop -->
+<section>
+  <section id="loop-slide">
+    <span class="eyebrow">3 · The agentic loop</span>
+    <h2>The loop</h2>
+    <svg id="loop" viewBox="0 0 900 400" style="width:100%;max-height:520px">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
+      </defs>
+      <!-- arrows -->
+      <path id="a-sys"  class="edge" d="M200,45 L330,70"/>
+      <path id="a-msg"  class="edge" d="M200,145 L330,95"/>
+      <path id="a-tool" class="edge" d="M420,130 L420,200"/>
+      <path id="a-grd"  class="edge" d="M420,270 L420,320"/>
+      <path id="a-back" class="edge" d="M330,355 L110,355 L110,182"/>
+      <path id="a-end"  class="edge" d="M510,85 L700,85"/>
+      <text class="elabel" x="432" y="170">tool_use</text>
+      <text class="elabel" x="432" y="302">guardrails</text>
+      <text class="elabel" x="150" y="342">tool result is appended</text>
+      <text class="elabel" x="605" y="70" style="text-anchor:middle">end_turn</text>
+      <!-- nodes -->
+      <g id="n-sys" class="nd"><rect x="20" y="10" width="180" height="70" rx="14"/><text x="110" y="52">System prompt</text></g>
+      <g id="n-msg" class="nd"><rect x="20" y="110" width="180" height="70" rx="14"/><text x="110" y="142">Messages</text><text id="cnt" class="small" x="110" y="166">1</text></g>
+      <g id="n-model" class="nd model"><rect x="330" y="40" width="180" height="90" rx="14"/><text x="420" y="92">Model</text></g>
+      <g id="n-tool" class="nd tool"><rect x="330" y="200" width="180" height="70" rx="14"/><text x="420" y="242">Tool use</text></g>
+      <g id="n-grd" class="nd hook"><rect x="330" y="320" width="180" height="70" rx="14"/><text x="420" y="352">Run tool</text><text class="small" x="420" y="376">checked by guardrails</text></g>
+      <g id="n-end" class="nd end"><rect x="700" y="40" width="180" height="90" rx="14"/><text x="790" y="92">Response</text></g>
+      <!-- step numbers, the same ones the notes and the trace slide use -->
+      <g id="s1" class="st"><circle cx="250" cy="90" r="15"/><text x="250" y="96">1</text></g>
+      <g id="s2" class="st"><circle cx="330" cy="40" r="15"/><text x="330" y="46">2</text></g>
+      <g id="s3" class="st"><circle cx="330" cy="200" r="15"/><text x="330" y="206">3</text></g>
+      <g id="s4" class="st"><circle cx="330" cy="320" r="15"/><text x="330" y="326">4</text></g>
+      <g id="s5" class="st"><circle cx="110" cy="265" r="15"/><text x="110" y="271">5</text></g>
+      <g id="s6" class="st"><circle cx="700" cy="40" r="15"/><text x="700" y="46">6</text></g>
+    </svg>
+    <style>
+      #loop text { font: 600 22px system-ui, sans-serif; fill: var(--text); text-anchor: middle; }
+      #loop text.small { font-size: 16px; font-weight: 500; fill: var(--muted); }
+      #loop text.elabel { font-size: 15px; font-weight: 600; fill: var(--muted); text-anchor: start; }
+      #loop .nd rect { fill: var(--surface); stroke: var(--border); stroke-width: 2; transition: all .3s; }
+      #loop .nd.on rect { stroke: var(--accent); fill: var(--accent-soft); }
+      #loop .nd.tool.on rect { stroke: var(--ok); fill: var(--ok-soft); }
+      #loop .nd.hook.on rect { stroke: var(--info); fill: var(--info-soft); }
+      #loop .nd.end.on rect { stroke: var(--ok); fill: var(--ok); } #loop .nd.end.on text { fill: var(--bg); }
+      #loop .edge { fill: none; stroke: var(--border); stroke-width: 3; marker-end: url(#ah); transition: stroke .3s; }
+      #loop .edge.on { stroke: var(--accent); }
+      #loop .st circle { fill: var(--surface-2); stroke: var(--border); stroke-width: 2; transition: all .3s; }
+      #loop .st text { font-size: 16px; font-weight: 700; fill: var(--muted); }
+      #loop .st.on circle { fill: var(--accent); stroke: var(--accent); } #loop .st.on text { fill: #fff; }
+    </style>
+    <aside class="notes">~3 min. Runs by itself; follow the numbers. 1: the system prompt and the messages go to the model. 2: one inference call. 3: the model answers with a tool use. 4: the harness runs the tool; guardrails check before and after. 5: the result is appended to the messages, back to 1. Two loops here, then 6: the model answers with end_turn and the response comes out. The animation then restarts.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">3 · The agentic loop</span>
+    <h2>The same loop in code</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="1|2-3|5-7|8-9|12">for (iteration in 1..config.maxIterations) {
+    val response = model.infer(request)                         // 2
+    history += Message.assistant(response.content)
+
+    when (response.stopReason) {
+        StopReason.ToolUse ->                                   // 3
+            history += Message.user(toolUses.map(::executeToolUse)) // 4, 5
+        StopReason.EndTurn ->                                   // 6
+            return AgentResult.Completed(history.last().text)
+    }
+}
+return AgentResult.LimitReached("maxIterations")</code></pre>
+    <p class="sub">harness-core/…/Agent.kt, trimmed. You extend this loop; you never rewrite it.</p>
+    <aside class="notes">~2 min. The numbers match the diagram. Highlights: the iteration ceiling, one inference call, the two stop reasons, the limit. toolUses are the tool-use blocks of the response.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">3 · The agentic loop</span>
+    <h2>The trace shows every step</h2>
+    <div class="grid g3">
+      <div class="card hot"><b>2 · Inference</b><span class="sub">tokens per part, billed usage, cache hits</span></div>
+      <div class="card ok"><b>3, 4 · Tool calls</b><span class="sub">every call and its result</span></div>
+      <div class="card info"><b>4 · Guard lines</b><span class="sub">every guardrail decision that is not the default</span></div>
+    </div>
+    <p class="sub" style="margin-top:1em">Run: <code>./gradlew :app:run -q --console=plain</code> &nbsp;·&nbsp; More detail: <code>/report</code> writes the session as an HTML page.</p>
+    <aside class="notes">Show a live run if possible. The trace shows estimated tokens per part, billed usage, cache hits, every tool call and every non-default guardrail decision. /report and MODEL_LOG_RAW are explained in workshop.html under "Look under the hood".</aside>
+  </section>
+</section>
+
+<!-- 4 · The workshop -->
+<section>
+  <section>
+    <span class="eyebrow">4 · The workshop</span>
+    <h2>We teach an agent to mod Red Alert</h2>
+    <div class="grid g2" style="align-items:start">
+      <div>
+        <div class="card" style="margin-bottom:.5em"><b>Red Alert</b><span class="sub">Real-time strategy game from 1996 (Command &amp; Conquer): build a base, train an army, win.</span></div>
+        <div class="card" style="margin-bottom:.5em"><b>OpenRA</b><span class="sub">Open-source remake in C#. Far too big for a model's context, easy to break by guessing.</span></div>
+        <div class="card hot"><b>Modding</b><span class="sub">Change the game without touching the engine: units and weapons are YAML rules, missions are Lua.</span></div>
+      </div>
+      <div>
+        <pre style="margin-top:0"><code class="language-yaml" data-trim>2TNK:            # medium tank
+    Valued:
+        Cost: 850
+    Health:
+        HP: 46000
+    Mobile:
+        Speed: 72</code></pre>
+        <p class="sub">mods/ra/rules/vehicles.yaml, trimmed</p>
+        <p class="sub"><b style="color:var(--accent)">Goal:</b> "Make the medium tank 10% faster." The agent finds this, changes it, and proves the game still builds.</p>
+      </div>
+    </div>
+    <aside class="notes">~2 min. Why OpenRA: a real, large code base that does not fit in context, with data files that are easy to break. That is exactly the situation where context, tools and guardrails pay off. The agent clones OpenRA itself in assignment 1. A Docker toolbox builds, checks and packages it, so you can play your own mod at the end.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">4 · The workshop</span>
+    <h2>Pick a language</h2>
+    <div class="grid g3">
+      <div class="card"><b>Kotlin</b><span class="sub">extensions/kotlin/<br>register in <code>KotlinExtensions.kt</code></span></div>
+      <div class="card"><b>Java <span class="tag">default</span></b><span class="sub">extensions/java/<br>register in <code>JavaExtensions.java</code></span></div>
+      <div class="card"><b>TypeScript</b><span class="sub">extensions/typescript/<br>register in <code>index.ts</code></span></div>
+    </div>
+    <p class="sub" style="margin-top:1em">Same harness, same assignments, solutions in all three. Choose with <code>HARNESS_LANGUAGE=kotlin|java|typescript</code>.</p>
+    <p class="sub">TypeScript runs inside the JVM: no Node.js modules, no <code>fetch</code>. Read files through <code>ctx.workspace</code>.</p>
+    <aside class="notes">~1 min. Pick the language you are fastest in; the assignments are about the harness, not the language. workshop.html switches all code samples with the language buttons at the top.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">4 · The workshop</span>
+    <h2>Four extension points, one folder each</h2>
+    <div class="grid g4">
+      <div class="card hot"><b>System prompt</b><code>systemprompt/</code><span class="sub">What it knows and how it behaves</span><span class="asg">Assignments 1, 2</span></div>
+      <div class="card ok"><b>Tools</b><code>tools/</code><span class="sub">What it can look up and do</span><span class="asg">Assignment 3</span></div>
+      <div class="card info"><b>Guardrails</b><code>guardrails/</code><span class="sub">What it may not do</span><span class="asg">Assignment 4</span></div>
+      <div class="card"><b>Listeners</b><code>listeners/</code><span class="sub">What you see: trace, cost</span><span class="asg">Assignment 5</span></div>
+    </div>
+    <div class="grid g2" style="margin-top:.8em">
+      <div class="lane"><h4>In every folder</h4><span class="sub"><code>defaults/</code> working examples to read<br><code>exercise/</code> where your code goes</span></div>
+      <div class="lane" style="border-color:var(--accent)"><h4 style="color:var(--accent)">Assignment 6</h4><span class="sub">Use all four to mod OpenRA: change a unit, check it, play it.</span></div>
+    </div>
+    <aside class="notes">~1.5 min. This is the map for the afternoon. Each part of the theory has a folder and an assignment. Read defaults/ first: every default is a complete, small example of the thing you are about to write.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">4 · The workshop</span>
+    <h2>The extension bundle</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="2|3|4-9|10">ExtensionBundle(
+    systemPrompt = DefaultSections.all(workspace),
+    tools = DefaultTools.all(),
+    guardrails = listOf(
+        ProtectedPathsGuardrail(),
+        CommandGuardrail(),
+        BuildFileGuardrail(),
+        ResultCapGuardrail(),
+    ),
+    listeners = listOf(ConsoleTraceListener()),
+)</code></pre>
+    <p class="sub">extensions/kotlin/…/KotlinExtensions.kt. Write a class in <code>exercise/</code>, add one line here. Nothing else to register.</p>
+    <aside class="notes">~1 min. System prompt sections, tools, guardrails and listeners. Add your own class, add a line to the list; nothing else to register. Java and TypeScript have the same bundle.</aside>
+  </section>
+</section>
+
+<!-- 5 · System prompt -->
+<section>
+  <section>
+    <span class="eyebrow">5 · System prompt</span>
+    <p class="ask">Why build your own: <q>What the agent knows</q> + <q>How the agent behaves</q></p>
+    <h2>What it influences</h2>
+    <ul>
+      <li>Role</li>
+      <li>Working agreements</li>
+      <li>Background knowledge</li>
+    </ul>
+    <p class="sub">Advisory: the model can ignore it.</p>
+    <p class="ws"><b>In the workshop</b> Assignment 1: tell the model the date, the OS and the state of OpenRA at start-up. Assignment 2: give it a mission and ground rules for modding. · <code>systemprompt/exercise/</code></p>
+    <aside class="notes">~1.5 min. Always in context, always paid for. Frozen for the session; dynamic sections (like the date) are appended to the conversation instead.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">5 · System prompt</span>
+    <h2>A section</h2>
+    <pre><code class="language-kotlin" data-trim>object Role {
+    fun section(workspace: Workspace) = SystemPromptSection.Static(
+        "role",
+        "You are a coding agent working in the directory " +
+            "${workspace.root.fileName}. Use the tools to inspect " +
+            "and change files; do not guess file contents.",
+    )
+}</code></pre>
+    <p class="sub">systemprompt/defaults/Role.kt. In assignment 2.3 you replace it with a mission.</p>
+  </section>
+</section>
+
+<!-- 6 · Tools -->
+<section>
+  <section>
+    <span class="eyebrow">6 · Tools</span>
+    <p class="ask">Why build your own: <q>How the agent gathers information and executes actions</q></p>
+    <h2>Tools get the model<br>the correct context</h2>
+    <div class="flow">
+      <div class="node tool">read_file</div>
+      <div class="node tool">grep</div>
+      <div class="node tool">glob</div>
+      <div class="node tool">run_command</div>
+    </div>
+    <p class="sub">The model reads the name, description and schema.</p>
+    <p class="ws"><b>In the workshop</b> Assignment 3: tools that start the OpenRA toolbox, find a unit, change one number and check that the game still builds. · <code>tools/exercise/</code></p>
+    <aside class="notes">~2 min. The model fetches what it needs instead of guessing. The description is the API doc: state limits there. Failure is a normal result the model reacts to. More tools cost context; fewer tools cost control.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">6 · Tools</span>
+    <h2>A tool</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="2|3|4|6-7">object ReadFile : Tool {
+    override val name = "read_file"
+    override val description = "Read a UTF-8 text file from the workspace."
+    override val inputSchema = JsonSchema.obj().string("path", "…").build()
+
+    override fun execute(input: ToolInput, ctx: ToolContext) =
+        ToolOutcome.Success(ctx.workspace.readText(input.string("path")))
+}</code></pre>
+    <p class="sub">tools/defaults/ReadFile.kt, trimmed. Start from <code>FileStats</code> in the same folder for assignment 3.</p>
+  </section>
+</section>
+
+<!-- 7 · Guardrails -->
+<section>
+  <section>
+    <span class="eyebrow">7 · Guardrails</span>
+    <p class="ask">Why build your own: <q>What the agent shouldn't do</q></p>
+    <h2>Protect against<br>unwanted behavior</h2>
+    <div class="grid" style="grid-template-columns:2fr 1fr;align-items:stretch">
+      <div class="lane"><h4>What a guardrail does</h4>
+        <div class="grid g2" style="margin-top:0">
+          <div class="card bad"><b>Prevent</b><span class="sub">action is blocked</span></div>
+          <div class="card"><b>Gate</b><span class="sub">human approves first</span></div>
+        </div></div>
+      <div class="lane" style="border-color:var(--ok)"><h4 style="color:var(--ok)">Why it holds</h4>
+        <div class="card ok" style="margin:0"><b>Enforce</b><span class="sub">the agent cannot ignore it</span></div></div>
+    </div>
+    <p class="ws"><b>In the workshop</b> Assignment 4: never push to OpenRA, no Python, don't take orders from files, keep secrets secret. · <code>guardrails/exercise/</code></p>
+    <aside class="notes">~3 min. A guardrail does two things. Prevent: the action is blocked, nobody decides. Gate: the action pauses and the human decides. Enforce is not a third action but the property of both: the check runs in the harness, outside the model, so the agent cannot ignore or talk its way around it. A system prompt instruction is advisory; the model can skip it. A guardrail can also require something, e.g. beforeEndTurn returns Continue until the tests have run.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">7 · Guardrails</span>
+    <h2>Four hooks</h2>
+    <pre><code class="language-kotlin" data-trim>interface Guardrail {
+    fun beforeInference(ctx)            // Proceed | Abort
+    fun beforeToolUse(call, ctx)        // Allow | Ask | Deny
+    fun afterToolUse(call, result, ctx) // Accept | Replace | Reject
+    fun beforeEndTurn(ctx)              // AllowEnd | Continue
+}</code></pre>
+    <p class="sub">All hooks have defaults. Implement the one you need.</p>
+  </section>
+  <section>
+    <span class="eyebrow">7 · Guardrails</span>
+    <h2>CommandGuardrail</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="3-4|5-6">override fun beforeToolUse(call: ToolCall, ctx: TurnContext): ToolDecision {
+    val command = call.input.string("command")
+    if (NEVER.any { it.containsMatchIn(command) })
+        return ToolDecision.Deny("never allowed")        // Prevent
+    return if (isReadOnly(command)) ToolDecision.Allow
+    else ToolDecision.Ask("runs: $command")              // Gate
+}</code></pre>
+    <p class="sub">guardrails/defaults/CommandGuardrail.kt, trimmed. Already on: you'll see it ask before <code>git clone</code>.</p>
+  </section>
+</section>
+
+<!-- 8 · Tools or skills? -->
+<section>
+  <section>
+    <span class="eyebrow">8 · Skills</span>
+    <h2>Do you need skills?</h2>
+    <p class="big">Skills let you extend an agent<br>you don't control.</p>
+    <p class="sub">In your own harness, load situational instructions on demand with a tool.</p>
+    <aside class="notes">~1 min. Skills are how you extend an agent whose code you cannot change, like Claude Code. In your own harness you add the prompt section or tool directly.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">8 · Skills</span>
+    <h2>Tool or skill?</h2>
+    <table>
+      <tr><th></th><th>Tool</th><th>Skill</th></tr>
+      <tr><td>What it is</td><td>Code the harness runs</td><td>Instructions the model reads</td></tr>
+      <tr><td>Gives the model</td><td>A result: data, or an action done</td><td>Know-how: how to do a task</td></tr>
+      <tr><td>Always in context</td><td>Name, description, schema</td><td>Name and a one-line description</td></tr>
+      <tr><td>Loaded when used</td><td>The result</td><td>The full instructions</td></tr>
+      <tr><td>Holds?</td><td><b>Yes</b>: the code does what it does</td><td><b>Advisory</b>, like the system prompt</td></tr>
+    </table>
+    <p class="sub">Use a tool when the answer can be computed. Use a skill when the model needs to know <i>how</i>.</p>
+    <aside class="notes">~1.5 min. Both are chosen by the model, based on a short description that is always in context. The difference is what comes back: a tool returns a result that code produced, a skill returns text the model should follow. Putting all situational instructions in the system prompt dilutes the model's attention on the rest (and costs tokens, though caching softens that). Loading them only when needed is the skill idea.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">8 · Skills</span>
+    <h2>A skill is a tool that returns instructions</h2>
+    <pre><code class="language-kotlin" data-trim data-line-numbers="3-5|9-12">object LoadSkill : Tool {
+    override val name = "load_skill"
+    override val description =
+        "Load the instructions for a task before you start it. " +
+        "Skills: lua_mission (write a mission), new_unit (add a unit)."
+    override val inputSchema = JsonSchema.obj()
+        .string("name", "Skill name").build()
+
+    override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
+        val name = input.string("name")
+        return ToolOutcome.Success(ctx.workspace.readText("skills/$name.md"))
+    }
+}</code></pre>
+    <p class="sub">The description lists the skills; the body is only loaded when the model asks for it.</p>
+    <aside class="notes">~1 min. Not in the default harness and not an assignment, but a good one for "What tool would you build?" in assignment 3 extra.</aside>
+  </section>
+</section>
+
+<!-- 9 · Summary -->
+<section>
+  <section>
+    <h2>Summary</h2>
+    <table>
+      <tr><th>You want to control</th><th>You use</th><th>Assignment</th></tr>
+      <tr><td>What the agent knows</td><td><b>System prompt</b></td><td>1, 2</td></tr>
+      <tr><td>How the agent behaves</td><td><b>System prompt</b></td><td>2</td></tr>
+      <tr><td>How it gathers information and executes actions</td><td><b>Tools</b></td><td>3</td></tr>
+      <tr><td>What it shouldn't do</td><td><b>Guardrails</b></td><td>4</td></tr>
+      <tr><td>What you see of it</td><td><b>Listeners</b></td><td>5</td></tr>
+    </table>
+    <p class="sub" style="margin-top:1em">Then assignment 6: use them all to mod OpenRA.</p>
+  </section>
+</section>
+
+<!-- 10 · Get started -->
+<section>
+  <section>
+    <style>
+      .reveal .stp{display:grid;grid-template-columns:1.6em 1fr;gap:.2em .6em;align-items:center;margin:.45em 0}
+      .reveal .stp .n{width:1.3em;height:1.3em;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-weight:600;font-size:.8em;display:flex;align-items:center;justify-content:center}
+      .reveal .stp b{font-size:.8em}
+      .reveal .stp pre{grid-column:2;margin:0;font-size:.5em}
+      .reveal .stp pre code{padding:.5em 1em}
+      .reveal .mc{display:flex;align-items:center;gap:1em;margin-bottom:.5em;padding:.6em .9em}
+      .reveal .mc .tag{font-family:monospace;font-size:.6em;text-transform:none;color:#fff;min-width:7em;text-align:center}
+      .reveal .mc b{font-size:.9em;margin:0}.reveal .mc .sub{font-size:.65em}
+    </style>
+    <span class="eyebrow">Get started</span>
+    <h2>Pick a model</h2>
+    <p class="sub" style="margin:0 0 .5em">One OpenAI-compatible endpoint for all models. Switch with <code>MODEL_NAME</code>.</p>
+    <div class="card hot mc"><span class="tag" style="background:var(--accent)">coding<br>DEFAULT</span><div><b>Claude Haiku 5.5</b><span class="sub">Start here: fast, strong with tools, cheap</span></div></div>
+    <div class="card mc"><span class="tag" style="background:#3f7a73">coding-smart</span><div><b>Claude Sonnet 5.5</b><span class="sub">For hard tasks, or when you are stuck</span></div></div>
+    <div class="card mc"><span class="tag" style="background:#5b6677">coding-open</span><div><b>DeepSeek-V4.1-Flash</b><span class="sub">Open-weights model for comparison (slower)</span></div></div>
+    <div class="grid g3" style="margin-top:.7em">
+      <div class="card" style="font-size:.6em"><b style="display:inline;color:var(--accent)">Budget</b> $10 per key, valid until 20 November</div>
+      <div class="card" style="font-size:.6em"><b style="display:inline;color:var(--accent)">Data</b> Prompts go to Anthropic/Google, outside the EU</div>
+      <div class="card" style="font-size:.6em"><b style="display:inline;color:var(--accent)">Key</b> Do not share, do not commit</div>
+    </div>
+  </section>
+  <section>
+    <span class="eyebrow">Get started</span>
+    <h2>Connect your harness in 4 steps</h2>
+    <div class="grid" style="grid-template-columns:3fr 1fr;align-items:center;margin-top:0">
+      <div>
+        <div class="stp"><span class="n">1</span><b>Check out the code</b>
+          <pre><code data-trim>git clone https://bitbucket.org/jdriven/workshop-agentic-harness</code></pre></div>
+        <div class="stp"><span class="n">2</span><b>Build it <span class="sub" style="font-size:.7em">(no key needed yet)</span></b>
+          <pre><code data-trim>./gradlew build</code></pre></div>
+        <div class="stp"><span class="n">3</span><b>Set your API key <span class="sub" style="font-size:.7em">(the sk-jdriven-… key on your card)</span></b>
+          <pre><code data-trim>export MODEL_API_KEY=sk-jdriven-xxxx-xxxx-xxxx-xxxx</code></pre></div>
+        <div class="stp"><span class="n">4</span><b>Check the connection <span class="sub" style="font-size:.7em">(expect [ok])</span></b>
+          <pre><code data-trim>./gradlew verifySetup</code></pre></div>
+      </div>
+      <div class="qr"><svg viewBox="0 0 37 37" role="img" aria-label="QR code to the repository"><rect width="37" height="37" fill="#fff"/><path fill="#000" d="M2,2H3V3H2zM3,2H4V3H3zM4,2H5V3H4zM5,2H6V3H5zM6,2H7V3H6zM7,2H8V3H7zM8,2H9V3H8zM10,2H11V3H10zM11,2H12V3H11zM12,2H13V3H12zM13,2H14V3H13zM16,2H17V3H16zM18,2H19V3H18zM19,2H20V3H19zM20,2H21V3H20zM22,2H23V3H22zM24,2H25V3H24zM28,2H29V3H28zM29,2H30V3H29zM30,2H31V3H30zM31,2H32V3H31zM32,2H33V3H32zM33,2H34V3H33zM34,2H35V3H34zM2,3H3V4H2zM8,3H9V4H8zM15,3H16V4H15zM16,3H17V4H16zM19,3H20V4H19zM22,3H23V4H22zM26,3H27V4H26zM28,3H29V4H28zM34,3H35V4H34zM2,4H3V5H2zM4,4H5V5H4zM5,4H6V5H5zM6,4H7V5H6zM8,4H9V5H8zM10,4H11V5H10zM11,4H12V5H11zM16,4H17V5H16zM19,4H20V5H19zM23,4H24V5H23zM25,4H26V5H25zM28,4H29V5H28zM30,4H31V5H30zM31,4H32V5H31zM32,4H33V5H32zM34,4H35V5H34zM2,5H3V6H2zM4,5H5V6H4zM5,5H6V6H5zM6,5H7V6H6zM8,5H9V6H8zM12,5H13V6H12zM16,5H17V6H16zM17,5H18V6H17zM18,5H19V6H18zM19,5H20V6H19zM20,5H21V6H20zM22,5H23V6H22zM23,5H24V6H23zM24,5H25V6H24zM28,5H29V6H28zM30,5H31V6H30zM31,5H32V6H31zM32,5H33V6H32zM34,5H35V6H34zM2,6H3V7H2zM4,6H5V7H4zM5,6H6V7H5zM6,6H7V7H6zM8,6H9V7H8zM11,6H12V7H11zM12,6H13V7H12zM13,6H14V7H13zM14,6H15V7H14zM16,6H17V7H16zM17,6H18V7H17zM18,6H19V7H18zM23,6H24V7H23zM24,6H25V7H24zM28,6H29V7H28zM30,6H31V7H30zM31,6H32V7H31zM32,6H33V7H32zM34,6H35V7H34zM2,7H3V8H2zM8,7H9V8H8zM10,7H11V8H10zM11,7H12V8H11zM13,7H14V8H13zM14,7H15V8H14zM15,7H16V8H15zM16,7H17V8H16zM18,7H19V8H18zM19,7H20V8H19zM20,7H21V8H20zM22,7H23V8H22zM23,7H24V8H23zM28,7H29V8H28zM34,7H35V8H34zM2,8H3V9H2zM3,8H4V9H3zM4,8H5V9H4zM5,8H6V9H5zM6,8H7V9H6zM7,8H8V9H7zM8,8H9V9H8zM10,8H11V9H10zM12,8H13V9H12zM14,8H15V9H14zM16,8H17V9H16zM18,8H19V9H18zM20,8H21V9H20zM22,8H23V9H22zM24,8H25V9H24zM26,8H27V9H26zM28,8H29V9H28zM29,8H30V9H29zM30,8H31V9H30zM31,8H32V9H31zM32,8H33V9H32zM33,8H34V9H33zM34,8H35V9H34zM11,9H12V10H11zM12,9H13V10H12zM13,9H14V10H13zM16,9H17V10H16zM20,9H21V10H20zM22,9H23V10H22zM24,9H25V10H24zM26,9H27V10H26zM2,10H3V11H2zM4,10H5V11H4zM8,10H9V11H8zM9,10H10V11H9zM13,10H14V11H13zM14,10H15V11H14zM17,10H18V11H17zM18,10H19V11H18zM21,10H22V11H21zM22,10H23V11H22zM25,10H26V11H25zM29,10H30V11H29zM32,10H33V11H32zM34,10H35V11H34zM2,11H3V12H2zM4,11H5V12H4zM5,11H6V12H5zM6,11H7V12H6zM12,11H13V12H12zM13,11H14V12H13zM16,11H17V12H16zM17,11H18V12H17zM18,11H19V12H18zM21,11H22V12H21zM22,11H23V12H22zM25,11H26V12H25zM26,11H27V12H26zM28,11H29V12H28zM31,11H32V12H31zM34,11H35V12H34zM2,12H3V13H2zM3,12H4V13H3zM6,12H7V13H6zM7,12H8V13H7zM8,12H9V13H8zM10,12H11V13H10zM12,12H13V13H12zM13,12H14V13H13zM15,12H16V13H15zM16,12H17V13H16zM17,12H18V13H17zM20,12H21V13H20zM21,12H22V13H21zM22,12H23V13H22zM24,12H25V13H24zM25,12H26V13H25zM26,12H27V13H26zM31,12H32V13H31zM32,12H33V13H32zM34,12H35V13H34zM4,13H5V14H4zM5,13H6V14H5zM9,13H10V14H9zM10,13H11V14H10zM12,13H13V14H12zM13,13H14V14H13zM16,13H17V14H16zM18,13H19V14H18zM20,13H21V14H20zM21,13H22V14H21zM24,13H25V14H24zM25,13H26V14H25zM27,13H28V14H27zM29,13H30V14H29zM30,13H31V14H30zM31,13H32V14H31zM34,13H35V14H34zM2,14H3V15H2zM7,14H8V15H7zM8,14H9V15H8zM11,14H12V15H11zM13,14H14V15H13zM14,14H15V15H14zM15,14H16V15H15zM16,14H17V15H16zM17,14H18V15H17zM18,14H19V15H18zM19,14H20V15H19zM20,14H21V15H20zM21,14H22V15H21zM22,14H23V15H22zM24,14H25V15H24zM25,14H26V15H25zM28,14H29V15H28zM29,14H30V15H29zM33,14H34V15H33zM34,14H35V15H34zM2,15H3V16H2zM3,15H4V16H3zM4,15H5V16H4zM5,15H6V16H5zM11,15H12V16H11zM12,15H13V16H12zM13,15H14V16H13zM16,15H17V16H16zM18,15H19V16H18zM19,15H20V16H19zM21,15H22V16H21zM22,15H23V16H22zM23,15H24V16H23zM25,15H26V16H25zM26,15H27V16H26zM28,15H29V16H28zM32,15H33V16H32zM33,15H34V16H33zM34,15H35V16H34zM2,16H3V17H2zM3,16H4V17H3zM5,16H6V17H5zM7,16H8V17H7zM8,16H9V17H8zM10,16H11V17H10zM11,16H12V17H11zM13,16H14V17H13zM15,16H16V17H15zM18,16H19V17H18zM20,16H21V17H20zM21,16H22V17H21zM22,16H23V17H22zM24,16H25V17H24zM25,16H26V17H25zM26,16H27V17H26zM29,16H30V17H29zM30,16H31V17H30zM34,16H35V17H34zM4,17H5V18H4zM6,17H7V18H6zM7,17H8V18H7zM10,17H11V18H10zM11,17H12V18H11zM12,17H13V18H12zM14,17H15V18H14zM15,17H16V18H15zM17,17H18V18H17zM18,17H19V18H18zM21,17H22V18H21zM22,17H23V18H22zM24,17H25V18H24zM25,17H26V18H25zM26,17H27V18H26zM27,17H28V18H27zM28,17H29V18H28zM31,17H32V18H31zM2,18H3V19H2zM4,18H5V19H4zM5,18H6V19H5zM6,18H7V19H6zM7,18H8V19H7zM8,18H9V19H8zM11,18H12V19H11zM13,18H14V19H13zM14,18H15V19H14zM18,18H19V19H18zM26,18H27V19H26zM28,18H29V19H28zM29,18H30V19H29zM33,18H34V19H33zM2,19H3V20H2zM3,19H4V20H3zM7,19H8V20H7zM9,19H10V20H9zM11,19H12V20H11zM13,19H14V20H13zM15,19H16V20H15zM17,19H18V20H17zM18,19H19V20H18zM19,19H20V20H19zM21,19H22V20H21zM22,19H23V20H22zM23,19H24V20H23zM25,19H26V20H25zM26,19H27V20H26zM28,19H29V20H28zM31,19H32V20H31zM33,19H34V20H33zM34,19H35V20H34zM2,20H3V21H2zM4,20H5V21H4zM5,20H6V21H5zM8,20H9V21H8zM9,20H10V21H9zM10,20H11V21H10zM12,20H13V21H12zM14,20H15V21H14zM15,20H16V21H15zM16,20H17V21H16zM17,20H18V21H17zM18,20H19V21H18zM21,20H22V21H21zM23,20H24V21H23zM25,20H26V21H25zM26,20H27V21H26zM27,20H28V21H27zM28,20H29V21H28zM29,20H30V21H29zM31,20H32V21H31zM32,20H33V21H32zM34,20H35V21H34zM2,21H3V22H2zM3,21H4V22H3zM5,21H6V22H5zM7,21H8V22H7zM9,21H10V22H9zM11,21H12V22H11zM12,21H13V22H12zM13,21H14V22H13zM14,21H15V22H14zM17,21H18V22H17zM18,21H19V22H18zM19,21H20V22H19zM21,21H22V22H21zM22,21H23V22H22zM24,21H25V22H24zM26,21H27V22H26zM27,21H28V22H27zM30,21H31V22H30zM31,21H32V22H31zM33,21H34V22H33zM34,21H35V22H34zM4,22H5V23H4zM5,22H6V23H5zM7,22H8V23H7zM8,22H9V23H8zM9,22H10V23H9zM11,22H12V23H11zM12,22H13V23H12zM14,22H15V23H14zM16,22H17V23H16zM17,22H18V23H17zM19,22H20V23H19zM22,22H23V23H22zM25,22H26V23H25zM26,22H27V23H26zM28,22H29V23H28zM5,23H6V24H5zM6,23H7V24H6zM7,23H8V24H7zM11,23H12V24H11zM13,23H14V24H13zM21,23H22V24H21zM22,23H23V24H22zM25,23H26V24H25zM26,23H27V24H26zM28,23H29V24H28zM29,23H30V24H29zM34,23H35V24H34zM2,24H3V25H2zM3,24H4V25H3zM5,24H6V25H5zM8,24H9V25H8zM11,24H12V25H11zM13,24H14V25H13zM15,24H16V25H15zM17,24H18V25H17zM19,24H20V25H19zM21,24H22V25H21zM22,24H23V25H22zM23,24H24V25H23zM25,24H26V25H25zM27,24H28V25H27zM28,24H29V25H28zM34,24H35V25H34zM7,25H8V26H7zM12,25H13V26H12zM14,25H15V26H14zM16,25H17V26H16zM21,25H22V26H21zM24,25H25V26H24zM26,25H27V26H26zM28,25H29V26H28zM29,25H30V26H29zM30,25H31V26H30zM31,25H32V26H31zM34,25H35V26H34zM2,26H3V27H2zM3,26H4V27H3zM4,26H5V27H4zM6,26H7V27H6zM8,26H9V27H8zM9,26H10V27H9zM10,26H11V27H10zM12,26H13V27H12zM13,26H14V27H13zM14,26H15V27H14zM16,26H17V27H16zM17,26H18V27H17zM21,26H22V27H21zM22,26H23V27H22zM25,26H26V27H25zM26,26H27V27H26zM27,26H28V27H27zM28,26H29V27H28zM29,26H30V27H29zM30,26H31V27H30zM31,26H32V27H31zM34,26H35V27H34zM10,27H11V28H10zM14,27H15V28H14zM17,27H18V28H17zM18,27H19V28H18zM20,27H21V28H20zM21,27H22V28H21zM22,27H23V28H22zM23,27H24V28H23zM24,27H25V28H24zM25,27H26V28H25zM26,27H27V28H26zM30,27H31V28H30zM34,27H35V28H34zM2,28H3V29H2zM3,28H4V29H3zM4,28H5V29H4zM5,28H6V29H5zM6,28H7V29H6zM7,28H8V29H7zM8,28H9V29H8zM10,28H11V29H10zM11,28H12V29H11zM13,28H14V29H13zM15,28H16V29H15zM16,28H17V29H16zM17,28H18V29H17zM19,28H20V29H19zM20,28H21V29H20zM21,28H22V29H21zM22,28H23V29H22zM23,28H24V29H23zM24,28H25V29H24zM26,28H27V29H26zM28,28H29V29H28zM30,28H31V29H30zM31,28H32V29H31zM32,28H33V29H32zM34,28H35V29H34zM2,29H3V30H2zM8,29H9V30H8zM11,29H12V30H11zM12,29H13V30H12zM15,29H16V30H15zM16,29H17V30H16zM20,29H21V30H20zM21,29H22V30H21zM22,29H23V30H22zM25,29H26V30H25zM26,29H27V30H26zM30,29H31V30H30zM31,29H32V30H31zM33,29H34V30H33zM34,29H35V30H34zM2,30H3V31H2zM4,30H5V31H4zM5,30H6V31H5zM6,30H7V31H6zM8,30H9V31H8zM11,30H12V31H11zM12,30H13V31H12zM14,30H15V31H14zM16,30H17V31H16zM18,30H19V31H18zM19,30H20V31H19zM20,30H21V31H20zM25,30H26V31H25zM26,30H27V31H26zM27,30H28V31H27zM28,30H29V31H28zM29,30H30V31H29zM30,30H31V31H30zM34,30H35V31H34zM2,31H3V32H2zM4,31H5V32H4zM5,31H6V32H5zM6,31H7V32H6zM8,31H9V32H8zM11,31H12V32H11zM13,31H14V32H13zM14,31H15V32H14zM16,31H17V32H16zM18,31H19V32H18zM20,31H21V32H20zM21,31H22V32H21zM22,31H23V32H22zM25,31H26V32H25zM27,31H28V32H27zM29,31H30V32H29zM30,31H31V32H30zM32,31H33V32H32zM33,31H34V32H33zM34,31H35V32H34zM2,32H3V33H2zM4,32H5V33H4zM5,32H6V33H5zM6,32H7V33H6zM8,32H9V33H8zM10,32H11V33H10zM12,32H13V33H12zM18,32H19V33H18zM20,32H21V33H20zM21,32H22V33H21zM23,32H24V33H23zM25,32H26V33H25zM27,32H28V33H27zM29,32H30V33H29zM30,32H31V33H30zM31,32H32V33H31zM32,32H33V33H32zM33,32H34V33H33zM34,32H35V33H34zM2,33H3V34H2zM8,33H9V34H8zM12,33H13V34H12zM14,33H15V34H14zM15,33H16V34H15zM17,33H18V34H17zM18,33H19V34H18zM26,33H27V34H26zM27,33H28V34H27zM29,33H30V34H29zM30,33H31V34H30zM31,33H32V34H31zM2,34H3V35H2zM3,34H4V35H3zM4,34H5V35H4zM5,34H6V35H5zM6,34H7V35H6zM7,34H8V35H7zM8,34H9V35H8zM10,34H11V35H10zM12,34H13V35H12zM13,34H14V35H13zM14,34H15V35H14zM18,34H19V35H18zM21,34H22V35H21zM22,34H23V35H22zM24,34H25V35H24zM26,34H27V35H26zM29,34H30V35H29zM30,34H31V35H30zM31,34H32V35H31zM34,34H35V35H34z"/></svg><span class="sub">Scan for the repo</span></div>
+    </div>
+    <p class="sub" style="margin-top:.4em">Base URL and model name default to the workshop proxy and <code>coding</code>. Windows: <code>gradlew.bat</code> and <code>$env:MODEL_API_KEY = "…"</code>, see <code>workshop.html</code>.</p>
+    <aside class="notes">Leave this slide up while people set up. MODEL_BASE_URL and MODEL_NAME only need setting for another endpoint or model.</aside>
+  </section>
+  <section>
+    <span class="eyebrow">Together</span>
+    <h2>Assignment 1.1, live</h2>
+    <div class="stp"><span class="n">1</span><b>Read the assignment in <code>workshop.html</code>: goal, "why", hints</b></div>
+    <div class="stp"><span class="n">2</span><b>Ask the agent the time, the OS and whether this is a git repo; watch the tool calls</b></div>
+    <div class="stp"><span class="n">3</span><b>Write an <code>Environment</code> section in <code>systemprompt/exercise/</code></b></div>
+    <div class="stp"><span class="n">4</span><b>Register it in the bundle after the defaults, restart, ask again: usually no tool calls</b></div>
+    <div class="stp"><span class="n">5</span><b>Check the system prompt in the trace or <code>/report</code></b></div>
+    <p class="punch">Then it's your turn: 1.2 onwards. Stuck for 5 minutes? Open the solution and keep moving.</p>
+    <aside class="notes">~8 min. Do it live in the language most people chose. Show where the exercise folder is, how registering works and how to verify in the trace. That pattern (write, register, restart, verify) repeats in every assignment.</aside>
+  </section>
+</section>
+
+</div></div>
+
+<script src="revealjs/reveal.min.js"></script>
+<script src="revealjs/plugin/notes/notes.min.js"></script>
+<script src="revealjs/plugin/highlight/highlight.min.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true, slideNumber: 'c/t', width: 1280, height: 720, margin: 0.06,
+    transition: 'fade', transitionSpeed: 'fast',
+    plugins: [RevealNotes, RevealHighlight]
+  });
+
+  // Theme toggle, as in workshop.html: follows the system until clicked.
+  (function () {
+    var root = document.documentElement, key = 'presentation.theme';
+    try { var t = localStorage.getItem(key); if (t) root.setAttribute('data-theme', t); } catch (e) {}
+    document.getElementById('themeBtn').addEventListener('click', function () {
+      var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var cur = root.getAttribute('data-theme') || (sysDark ? 'dark' : 'light');
+      var next = cur === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem(key, next); } catch (e) {}
+    });
+  })();
+
+  // Section 3: the self-running loop diagram.
+  (function () {
+    var svg = document.getElementById('loop'), timer = null, running = false;
+    var $ = function (id) { return document.getElementById(id); };
+    var ids = Array.prototype.slice.call(svg.querySelectorAll('.nd, .edge, .st')).map(function (e) { return e.id; });
+    function clear() { ids.forEach(function (id) { $(id).classList.remove('on'); }); }
+    function on(list) { list.forEach(function (id) { $(id).classList.add('on'); }); }
+    var tool = [['n-sys', 'n-msg', 'a-sys', 'a-msg', 's1'], ['n-model', 's2'], ['a-tool', 'n-tool', 's3'], ['a-grd', 'n-grd', 's4'], ['a-back', 'n-msg', 's5']];
+    var end = [['n-sys', 'n-msg', 'a-sys', 'a-msg', 's1'], ['n-model', 's2'], ['a-end', 'n-end', 's6']];
+    var script = [];
+    [3, 5].forEach(function (count) {
+      tool.forEach(function (st, i) { script.push({ on: st, cnt: i === 4 ? count : null, clear: i === 0 }); });
+    });
+    end.forEach(function (st, i) { script.push({ on: st, cnt: i === 2 ? 6 : null, clear: i === 0, hold: i === 2 }); });
+    var i = 0;
+    function tick() {
+      if (!running) return;
+      var st = script[i];
+      if (st.clear) clear();
+      on(st.on);
+      if (st.cnt) $('cnt').textContent = st.cnt;
+      i = (i + 1) % script.length;
+      timer = setTimeout(tick, st.hold ? 3000 : 800);
+    }
+    function start() { if (running) return; running = true; i = 0; clear(); $('cnt').textContent = '1'; timer = setTimeout(tick, 600); }
+    function stop() { running = false; clearTimeout(timer); clear(); $('cnt').textContent = '1'; }
+    function check() { (Reveal.getCurrentSlide() === $('loop-slide')) ? start() : stop(); }
+    Reveal.on('ready', check); Reveal.on('slidechanged', check);
+  })();
+</script>
+</body>
+</html>

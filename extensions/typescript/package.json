@@ -1,0 +1,18 @@
+{
+  "name": "harness-typescript-extensions",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Workshop extensions for the agentic harness, written in TypeScript",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "bundle": "esbuild src/index.ts --bundle --format=iife --global-name=__harnessExtension --target=es2022 --outfile=dist/extension.js",
+    "build": "npm run typecheck && npm run bundle",
+    "test": "tsc --noEmit -p tsconfig.test.json && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

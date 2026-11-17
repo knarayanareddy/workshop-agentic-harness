@@ -1,0 +1,9 @@
+{
+  // Type-checks the tests. They run in Node (vitest), so unlike src/ they may use Node's modules.
+  // src/globals.d.ts is left out on purpose: Node's types already declare console.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["test", "vitest.config.mts"]
+}

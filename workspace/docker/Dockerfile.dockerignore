@@ -1,0 +1,6 @@
+**
+!OpenRA
+!docker/bin
+OpenRA/.git
+OpenRA/bin
+OpenRA/**/obj

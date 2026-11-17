@@ -1,0 +1,8 @@
+#!/bin/sh
+# Compile OpenRA (engine + mods) for this container. Needed before check/smoke.
+set -eu
+cd "${OPENRA_DIR}"
+# Native Linux Docker leaves written files root-owned; hand them back.
+OWNER="$(stat -c %u:%g .)"
+[ "${OWNER%%:*}" = 0 ] || trap 'find "${OPENRA_DIR}" "${OUT_DIR}" -user 0 -exec chown -h "${OWNER}" {} + 2>/dev/null || :' EXIT
+make all

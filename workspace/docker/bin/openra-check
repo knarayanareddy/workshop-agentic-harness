@@ -1,0 +1,22 @@
+#!/bin/sh
+# Headless checks for a mod: build, MiniYAML/rules lint and Lua syntax.
+# Usage: openra-check [mod]   (default: ra)
+set -eu
+MOD="${1:-ra}"
+cd "${OPENRA_DIR}"
+# Native Linux Docker leaves written files root-owned; hand them back.
+OWNER="$(stat -c %u:%g .)"
+[ "${OWNER%%:*}" = 0 ] || trap 'find "${OPENRA_DIR}" "${OUT_DIR}" -user 0 -exec chown -h "${OWNER}" {} + 2>/dev/null || :' EXIT
+
+echo "== Build"
+make all >/dev/null
+
+echo "== Lint: ${MOD}-content"
+./utility.sh "${MOD}-content" --check-yaml
+echo "== Lint: ${MOD}"
+./utility.sh "${MOD}" --check-yaml
+
+echo "== Lua syntax: mods/${MOD}"
+find "mods/${MOD}" -iname '*.lua' -print0 | xargs -0r -n1 luac5.1 -p
+
+echo "OK: ${MOD} passed all checks"

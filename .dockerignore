@@ -1,0 +1,13 @@
+.git
+.gradle
+.kotlin
+.idea
+**/build
+**/node_modules
+**/dist
+agentic-harness
+workspace/*
+!workspace/README.md
+.env
+Dockerfile
+.dockerignore
