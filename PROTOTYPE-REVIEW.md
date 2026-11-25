@@ -366,3 +366,76 @@ these are real, reviewable changes rather than edits to a scratch copy.
 - Items 5–8 (Kotlin/Java CI, real toolbox capture, `Agent.resume` + `execve` runner, pinned commit + LICENSE
   + CI) remain open. Item 8 is cheap and I can do it next; item 5 is the one that matters most, because 48
   solutions are still uncompiled.
+
+---
+
+# Part 4 — fix list items 5 and 8, applied and verified by CI
+
+Unlike Part 3, these could **not** be verified in this sandbox: it has no JDK and egress to
+`services.gradle.org`/`api.adoptium.net` fails at TLS. So the work was pushed to
+`arena/3d83f813-workshop-agentic-harness` and verified by GitHub Actions instead. Every claim below is
+backed by a run, not by reading the YAML.
+
+**Final run:** `45691754000` — **4/4 jobs green.**
+
+| Job | Time | What it proves |
+|---|---|---|
+| Prototype (TypeScript, offline) | 47 s | `typecheck`, 27 verification checks, 41×2 regression runs, DOM smoke, single-file build, and an assertion that `dist/index.html` has no external URL |
+| extensions/typescript tests | 24 s | the repo's own 19 tests still pass with the `build-file` fix |
+| **Kotlin/Java solutions compile** | **1 m 21 s** | **all 48 solutions compile** — the largest previously-unverified surface in the repo |
+| OpenRA pin still valid | 7 s | pin exists, has no `AGENTS.md`, is `net10.0`, and matches the source |
+
+## Item 5 — the 48 solutions now compile
+
+`prototype/scripts/place-solutions.mjs` places each solution into the module that owns it. The destination
+is **derived from the file's own `package` line**, never mapped by hand — all 48 were checked to carry one,
+24 per language, with the package always matching the module. It refuses to overwrite a tracked file, and
+the placed copies are gitignored (attendees write those files; they must never ship as a "solution key").
+
+Three commands, usable locally as well as in CI: `npm run solutions:install` / `solutions:verify` /
+`solutions:clean`. `verify` exits 1 when a solution is missing or has drifted from `prototype/data/`.
+
+**The gate was mutation-tested, not just observed green.** I injected a type error into
+`3.5/kotlin/SetActorValue.kt`, pushed, and the job failed (run `45691462744`); reverting it went green
+again. A gate that has never failed is a gate nobody knows works.
+
+## Item 8 — pin, licence, CI
+
+- **Pin is now real:** `1f594e32065615ed1847962c80ecfe6e868a11c3` (2026-10-20). Verified through the API:
+  the commit resolves, `Directory.Build.props` targets **`net10.0`**, and `AGENTS.md` returns **404**. It is
+  the last commit before upstream added the prohibition (`9636b63ea`, 2026-10-28). The simulated `git log`
+  fixture was updated to the same SHA so the provenance section reads *matches* rather than *DOES NOT
+  MATCH*; the panel label no longer says "illustrative"; and `verify.tsx` now compares against `PIN`
+  instead of a hardcoded prefix — that hardcoded string was the only thing that broke when the pin moved.
+- **LICENSE:** MIT, plus an explicit note that this repo does **not** vendor OpenRA (it is cloned at
+  runtime under its own licence). Swap the holder line if you want a person or company named.
+- **`.github/workflows/ci.yml`:** four jobs, triggers on `main`, `arena/**`, PRs and manual dispatch.
+  The `upstream-pin` job is the interesting one: the workshop's premises about upstream are *claims*, and
+  this job fails loudly if the pin is force-pushed away, `AGENTS.md` appears at that commit, or the
+  target framework changes. It caught a real bug in itself, too (see below).
+
+## What CI caught that I did not
+
+Worth recording, because it is the argument for having built it:
+
+1. **`upstream-pin` had no `actions/checkout`.** Its first step only used `curl`, so the repo was never
+   checked out and the pin-agreement `grep` ran against an empty workspace. My sandbox run of that shell
+   logic passed because the files were already on disk. The fix needed the runner to *tell* me — which it
+   could not, because **workflow logs are served from `productionresultssa7.blob.core.windows.net`, a host
+   this sandbox cannot reach**. So I re-plumbed the diagnostics through `::notice::`/`::error::`
+   annotations, which `gh run view` does show. That turned "exit 1, cause unknown" into
+   `pin line: grep: prototype/v2/extensions.ts: No such file or directory` in one run.
+2. **Four deprecated action versions** were emitting warnings on every run; bumped to v5.
+
+## Honest limits on this part
+
+- **CI is green, not exhaustive.** It compiles the solutions; it does not *run* them against a live
+  harness, and it does not exercise the Kotlin/Java registrations (the `_registration.txt` snippets are
+  still applied by hand by attendees). Compilation catches type/API drift — the failure mode that would
+  embarrass a workshop — not semantic mistakes inside a solution.
+- The workflow needs network (Gradle downloads Koin/Kotlin/JUnit). That does **not** weaken the prototype's
+  offline contract: the prototype jobs need no network beyond `npm ci`.
+- The pin is a **good** commit, not a blessed one: whether to pin at all, and which commit, remains the
+  organisers' call. `1f594e3` is simply the newest date at which every workshop premise was still true.
+- Item 6 (capture real toolbox output) and item 7 (`Agent.resume`, `execve` runner) remain open; both need
+  Docker or a design change, not just a build step.
