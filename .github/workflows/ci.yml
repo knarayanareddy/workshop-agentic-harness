@@ -119,13 +119,12 @@ jobs:
           test "$agents" = "404"
       - name: Pin in prototype and worksheet agree
         run: |
-          echo "OPENRA_PIN=[$OPENRA_PIN]"
-          echo "--- the pin line as committed ---"
-          grep -n 'export const PIN' prototype/v2/extensions.ts || echo "NO PIN LINE FOUND"
-          echo "--- exact grep ---"
+          echo "::notice::OPENRA_PIN=[$OPENRA_PIN] pwd=$(pwd)"
+          echo "::notice::file exists: $(test -f prototype/v2/extensions.ts && echo yes || echo NO)"
+          echo "::notice::pin line: $(grep -m1 'export const PIN' prototype/v2/extensions.ts 2>&1 || echo GONE)"
+          echo "::notice::len=$(wc -c < prototype/v2/extensions.ts 2>&1) sha=$(sha256sum prototype/v2/extensions.ts 2>/dev/null | cut -c1-12)"
           if ! grep -q "$OPENRA_PIN" prototype/v2/extensions.ts; then
-            echo "prototype/v2/extensions.ts does not contain the pin"
-            echo "workspace files present:"; ls prototype/v2/ | head
+            echo "::error::pin mismatch: env has $OPENRA_PIN but the file does not contain it"
             exit 1
           fi
           echo "prototype/v2/extensions.ts pins $OPENRA_PIN"
