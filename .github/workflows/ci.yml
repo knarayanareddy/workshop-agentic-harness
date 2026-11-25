@@ -24,8 +24,8 @@ jobs:
     name: Prototype (TypeScript, offline)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -50,7 +50,7 @@ jobs:
             echo "dist/index.html references an external URL; it must be self-contained"; exit 1
           fi
           echo "dist/index.html: $(wc -c < dist/index.html) bytes, self-contained"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: prototype-dist
           path: dist/index.html
@@ -63,8 +63,8 @@ jobs:
       run:
         working-directory: extensions/typescript
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -79,11 +79,11 @@ jobs:
     name: Kotlin/Java solutions compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "25"
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Needed by the "pin agrees with source" step: the first step only uses curl.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Pinned commit exists and has no AGENTS.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
