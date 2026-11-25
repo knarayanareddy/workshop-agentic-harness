@@ -119,8 +119,15 @@ jobs:
           test "$agents" = "404"
       - name: Pin in prototype and worksheet agree
         run: |
-          set -eu
-          grep -q "$OPENRA_PIN" prototype/v2/extensions.ts
+          echo "OPENRA_PIN=[$OPENRA_PIN]"
+          echo "--- the pin line as committed ---"
+          grep -n 'export const PIN' prototype/v2/extensions.ts || echo "NO PIN LINE FOUND"
+          echo "--- exact grep ---"
+          if ! grep -q "$OPENRA_PIN" prototype/v2/extensions.ts; then
+            echo "prototype/v2/extensions.ts does not contain the pin"
+            echo "workspace files present:"; ls prototype/v2/ | head
+            exit 1
+          fi
           echo "prototype/v2/extensions.ts pins $OPENRA_PIN"
       - name: Pinned tree still targets net10.0
         env:
