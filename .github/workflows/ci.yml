@@ -104,6 +104,8 @@ jobs:
     name: OpenRA pin still valid
     runs-on: ubuntu-latest
     steps:
+      # Needed by the "pin agrees with source" step: the first step only uses curl.
+      - uses: actions/checkout@v4
       - name: Pinned commit exists and has no AGENTS.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
