@@ -1,0 +1,2 @@
+In KotlinExtensions.kt:
+systemPrompt = DefaultSections.all(workspace) + Environment.section(workspace),

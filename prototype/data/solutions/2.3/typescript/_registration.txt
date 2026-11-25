@@ -1,0 +1,9 @@
+Then delete the default role from systemprompt/defaults/index.ts, or the model gets two roles:
+export const defaultSections = (workspace: Workspace): SystemPromptSection[] => [
+  role(workspace),   // delete this line
+  workingAgreements,
+  iterationBudget,
+];
+
+And register mission first, in src/index.ts:
+systemPrompt: [mission, ...defaultSections(ctx.workspace), ...],

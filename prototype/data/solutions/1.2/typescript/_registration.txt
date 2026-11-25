@@ -1,0 +1,2 @@
+In index.ts:
+systemPrompt: [...defaultSections(ctx.workspace), environment(ctx), openRaCheckout],

@@ -1,0 +1,146 @@
+package com.jdriven.harness.app
+
+import com.jdriven.harness.api.ExtensionBundle
+import com.jdriven.harness.api.Workspace
+import com.jdriven.harness.core.*
+import com.jdriven.harness.extensions.java.JavaExtensions
+import com.jdriven.harness.extensions.kotlin.KotlinExtensions
+import com.jdriven.harness.typescript.TypeScriptExtensionException
+import com.jdriven.harness.typescript.TypeScriptExtensions
+import java.awt.Desktop
+import java.io.IOException
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.system.exitProcess
+
+private val EXIT_COMMANDS = setOf("exit", "quit", "/exit", "/quit")
+private const val LANGUAGE_ENV = "HARNESS_LANGUAGE"
+
+/**
+ * §7 Assembly. This file is the whole agent: it picks the bundle that lists every section of the system prompt,
+ * every tool and guardrail, in order, and wires it to the model. Nothing registers itself.
+ */
+fun main(args: Array<String>) {
+    val workspace = LocalWorkspace(Path(args.firstOrNull() ?: "workspace"))
+    val input = System.`in`.bufferedReader()
+
+    // HARNESS_LANGUAGE picks the language you work in. Each bundle is a complete agent on its own: the whole
+    // system prompt, tools, guardrails and trace, so only one is used (the tool names would clash).
+    val language = harnessLanguage()
+
+    val extensionsBundle = when (language) {
+        Language.JAVA -> JavaExtensions.bundle(workspace)
+        Language.KOTLIN -> KotlinExtensions.bundle(workspace)
+        Language.TYPESCRIPT -> loadTypeScript(workspace)
+    }
+
+    // One Agent is one session; /clear starts a new one. The recorder collects what /report shows.
+    lateinit var recorder: SessionRecorder
+    fun newSession(): Agent {
+        val client = OpenAiModelClient()
+        recorder = SessionRecorder(client.model, workspace.root, extensionsBundle.systemPrompt)
+        return Agent(
+            model = client,
+            systemPrompt = extensionsBundle.systemPrompt,
+            tools = extensionsBundle.tools,
+            guardrails = extensionsBundle.guardrails,
+            approvalHandler = ConsoleApprovalHandler(input),
+            listeners = extensionsBundle.listeners + recorder,
+            workspace = workspace,
+        )
+    }
+    var agent = newSession()
+
+    Splash.play()
+    println(Ansi.bold("Agentic harness") + " - workspace: " + Ansi.cyan(workspace.root.toString()) + " - extensions: " + Ansi.cyan(language.envValue))
+    println(Ansi.dim("Type a task, '/clear', '/report' or 'exit'. Each line is one turn; the session keeps its history.") + "\n")
+    while (true) {
+        print(Ansi.bold(Ansi.cyan("> ")))
+        System.out.flush()
+        val line = input.readLine()?.trim() ?: break
+        if (line in EXIT_COMMANDS) break
+        if (line.isEmpty()) continue
+        if (line == "/clear") {
+            agent = newSession()
+            println(Ansi.dim("Session cleared.") + "\n")
+            continue
+        }
+        if (line == "/report") {
+            try {
+                val file = recorder.writeReport(agent.messages, Path("reports")).toAbsolutePath()
+                println(Ansi.dim("Report written to ") + Ansi.cyan(file.toString()) + "\n")
+                openInBrowser(file)
+            } catch (e: IOException) {
+                println("\n${Ansi.red("[error] could not write the report: ${e.message}")}\n")
+            }
+            continue
+        }
+        try {
+            when (val result = agent.run(line)) {
+                is AgentResult.Completed -> println("\n${Ansi.green(result.text)}\n")
+                is AgentResult.Aborted -> println("\n${Ansi.yellow("[aborted] ${result.reason}")}\n")
+                is AgentResult.LimitReached -> println("\n${Ansi.yellow("[limit reached] ${result.limit}")}\n")
+            }
+        } catch (e: Exception) {
+            println("\n${Ansi.red("[error] ${e::class.simpleName}: ${e.message}")}\n")
+            if ("failed (401)" in e.message.orEmpty()) {
+                println(Ansi.dim("Set MODEL_API_KEY, then restart.") + "\n")
+            }
+        }
+    }
+}
+
+private enum class Language(val envValue: String) { JAVA("java"), KOTLIN("kotlin"), TYPESCRIPT("typescript") }
+
+/** Reads HARNESS_LANGUAGE; Java when it is not set. */
+private fun harnessLanguage(): Language {
+    val value = System.getenv(LANGUAGE_ENV)?.trim()?.lowercase()?.ifEmpty { null } ?: return Language.JAVA
+    return Language.entries.firstOrNull { it.envValue == value } ?: run {
+        println(Ansi.red("[error] $LANGUAGE_ENV=$value is not supported; use one of ${Language.entries.joinToString { it.envValue }}"))
+        exitProcess(1)
+    }
+}
+
+private fun loadTypeScript(workspace: Workspace): ExtensionBundle {
+    val bundle = Path("extensions/typescript/dist/extension.js")
+    val howToBuild = "start the harness with `./gradlew :app:run`, which builds it and shows any TypeScript errors"
+    if (!bundle.exists()) {
+        println(Ansi.red("[error] $bundle not found - the TypeScript build has not run or has failed; $howToBuild"))
+        exitProcess(1)
+    }
+    return try {
+        TypeScriptExtensions.load(bundle, workspace)
+    } catch (e: TypeScriptExtensionException) {
+        println(Ansi.red("[error] the TypeScript extensions failed to load: ${e.message}"))
+        exitProcess(1)
+    }
+}
+
+/** Best effort: there is no browser to open on a headless machine, and the path is printed anyway. */
+private fun openInBrowser(file: java.nio.file.Path) {
+    runCatching {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) Desktop.getDesktop().browse(file.toUri())
+    }
+}
+
+/**
+ * ANSI colors for REPL output. NO_COLOR turns them off and FORCE_COLOR turns them on; otherwise they are on when
+ * attached to a terminal, or when `./gradlew run` forwards our piped output to one (TERM set, not dumb, not CI).
+ */
+private object Ansi {
+    private val enabled = when {
+        !System.getenv("NO_COLOR").isNullOrEmpty() -> false
+        System.getenv("FORCE_COLOR").let { !it.isNullOrEmpty() && it != "0" } -> true
+        System.console()?.isTerminal == true -> true
+        else -> System.getenv("TERM").let { !it.isNullOrEmpty() && it != "dumb" } && System.getenv("CI") == null
+    }
+
+    private fun wrap(code: String, text: String) = if (enabled) "\u001b[${code}m$text\u001b[0m" else text
+
+    fun bold(text: String) = wrap("1", text)
+    fun dim(text: String) = wrap("2", text)
+    fun red(text: String) = wrap("31", text)
+    fun green(text: String) = wrap("32", text)
+    fun yellow(text: String) = wrap("33", text)
+    fun cyan(text: String) = wrap("36", text)
+}

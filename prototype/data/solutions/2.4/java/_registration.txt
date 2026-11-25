@@ -1,0 +1,8 @@
+Then delete the default working agreements from systemprompt/defaults/DefaultSections.java, or the model gets two sets of rules that disagree:
+return List.of(
+        Role.section(workspace),
+        WorkingAgreements.section(),   // delete this line
+        IterationBudget.section());
+
+And register GroundRules, in JavaExtensions.java:
+.section(GroundRules.section())

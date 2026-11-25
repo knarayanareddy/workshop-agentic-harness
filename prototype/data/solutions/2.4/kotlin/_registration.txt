@@ -1,0 +1,6 @@
+Then delete the default working agreements from systemprompt/defaults/DefaultSections.kt, or the model gets two sets of rules that disagree:
+fun all(workspace: Workspace): List<SystemPromptSection> = listOf(
+    Role.section(workspace),
+    WorkingAgreements.section(),   // delete this line
+    IterationBudget.section(),
+)

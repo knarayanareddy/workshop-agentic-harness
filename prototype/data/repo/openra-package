@@ -1,0 +1,48 @@
+#!/bin/sh
+# Package a self-contained build that runs natively on the host (no .NET needed).
+# Usage: openra-package [platform] [mod]
+#   platform: osx-arm64 | osx-x64 | linux-x64 | linux-arm64 | win-x64 (default: HOST_RID)
+#   mod:      ra (default) | cnc | d2k
+# Output lands in ${OUT_DIR}/<platform>/
+set -eu
+PLATFORM="${1:-$(cat /etc/openra-host-rid)}"
+MOD="${2:-ra}"
+DEST="${OUT_DIR}/${PLATFORM}"
+cd "${OPENRA_DIR}"
+# Native Linux Docker leaves written files root-owned; hand them back.
+OWNER="$(stat -c %u:%g .)"
+[ "${OWNER%%:*}" = 0 ] || trap 'find "${OPENRA_DIR}" "${OUT_DIR}" -user 0 -exec chown -h "${OWNER}" {} + 2>/dev/null || :' EXIT
+
+# A mounted checkout lacks the GeoIP database.
+[ -f IP2LOCATION-LITE-DB1.IPV6.BIN.ZIP ] || cp /opt/openra/IP2LOCATION-LITE-DB1.IPV6.BIN.ZIP .
+
+rm -rf "${DEST}"
+mkdir -p "${DEST}"
+# functions.sh is not written for set -u
+set +u
+. ./packaging/functions.sh
+install_assemblies "${OPENRA_DIR}" "${DEST}" "${PLATFORM}" True True True
+install_data "${OPENRA_DIR}" "${DEST}" "${MOD}"
+
+case "${PLATFORM}" in
+  win-*)
+    printf '@echo off\r\ncd /d "%%~dp0"\r\nOpenRA.exe Engine.EngineDir=. Game.Mod=%s %%*\r\n' "${MOD}" > "${DEST}/play.cmd"
+    ;;
+  *)
+    cat > "${DEST}/play.sh" <<SH
+#!/bin/sh
+# Launch OpenRA (${MOD}) from this folder.
+cd "\$(dirname "\$0")"
+if [ "\$(uname -s)" = "Darwin" ]; then
+  # Builds made on Linux are unsigned; Apple Silicon refuses to run those.
+  codesign --verify OpenRA 2>/dev/null || codesign --force --sign - OpenRA
+fi
+exec ./OpenRA Engine.EngineDir=. Game.Mod=${MOD} "\$@"
+SH
+    chmod +x "${DEST}/play.sh"
+    # Finder runs .command files in Terminal on double-click.
+    case "${PLATFORM}" in osx-*) cp "${DEST}/play.sh" "${DEST}/play.command" ;; esac
+    ;;
+esac
+
+echo "Packaged ${MOD} for ${PLATFORM} into ${DEST}"

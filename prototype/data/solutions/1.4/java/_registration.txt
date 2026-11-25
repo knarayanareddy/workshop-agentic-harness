@@ -1,0 +1,2 @@
+In JavaExtensions.java:
+.sections(OpenRaState.sections(workspace))

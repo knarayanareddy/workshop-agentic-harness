@@ -1,0 +1,92 @@
+{
+  "policy": "workshop-base",
+  "layer": "00-workshop",
+  "version": 3,
+  "owner": "workshop-staff",
+  "mode": "default",
+  "defaults": { "run_command": "deny" },
+  "rules": [
+    {
+      "id": "P-protected-files", "effect": "deny", "owner": "security",
+      "tool": ["read_file", "write_file", "edit_file", "list_files", "glob", "grep"],
+      "path": ["**/.env", "**/.env.*", "**/.git/**", "**/*.pem", "**/*.key", "**/id_rsa*"],
+      "except_path": ["**/.env.example"],
+      "rationale": "may hold secrets or repository internals (same intent as v1 protected-paths)"
+    },
+    {
+      "id": "P-build-files", "effect": "deny", "owner": "workshop-staff",
+      "tool": ["write_file", "edit_file"],
+      "path": ["**/build.gradle.kts", "**/settings.gradle.kts", "**/gradle.properties", "**/pom.xml", "**/package.json"],
+      "rationale": "make the test pass, not the build. v1's build-file guardrail only inspects write_file (REVIEW gap 3: edit_file bypasses it)",
+      "suggest": "Fix the code under test; leave build configuration to the user."
+    },
+    {
+      "id": "P-engine-code", "effect": "deny", "owner": "workshop-staff",
+      "tool": ["write_file", "edit_file"],
+      "path": ["OpenRA/**/*.cs"],
+      "rationale": "ground rule: mod through data (YAML/Lua), never the C# engine",
+      "suggest": "Express the change as a rules override under OpenRA/mods/ra/."
+    },
+    {
+      "id": "P-write-outside-mods", "effect": "ask", "owner": "workshop-staff",
+      "tool": ["write_file", "edit_file"],
+      "path_not": ["OpenRA/mods/**", "out/**", "AGENTS.md"],
+      "rationale": "write outside OpenRA/mods/ — confirm that is intended",
+      "scope": "directory"
+    },
+    {
+      "id": "P-edit-mod-data", "effect": "ask", "owner": "workshop-staff",
+      "tool": ["write_file", "edit_file"],
+      "path": ["OpenRA/mods/**"],
+      "rationale": "changes mod data; the approval shows the diff",
+      "scope": "directory",
+      "modes": ["default"]
+    },
+    {
+      "id": "P-plan-mode", "effect": "deny", "owner": "workshop-staff",
+      "tool": ["write_file", "edit_file", "set_actor_value", "start_toolbox", "play"],
+      "rationale": "permission mode 'plan' is read-only (cf. Claude Code plan mode)",
+      "modes": ["plan"]
+    },
+    {
+      "id": "P-no-upstream", "effect": "deny", "owner": "workshop-staff",
+      "tool": ["run_command"],
+      "argv": { "program": ["git"], "subcommand": ["push", "send-email", "remote", "request-pull"] },
+      "rationale": "upstream is a destination nobody here may write to: local-only policy (upstream AGENTS.md forbids agentic contributions)",
+      "suggest": "Leave changes uncommitted or commit locally; the user decides what happens next."
+    },
+    {
+      "id": "P-no-forge-cli", "effect": "deny", "owner": "workshop-staff",
+      "tool": ["run_command"],
+      "argv": { "program": ["gh", "hub", "glab"] },
+      "rationale": "forge CLIs open pull requests and call the GitHub API",
+      "suggest": "There is no remote work to do in this workshop."
+    },
+    {
+      "id": "P-outside-workspace", "effect": "deny", "owner": "security",
+      "tool": ["run_command"],
+      "argv": { "any_path_outside_workspace": true },
+      "rationale": "an argument resolves outside the workspace (absolute path or ..)",
+      "suggest": "Use paths relative to the workspace root."
+    },
+    {
+      "id": "P-readonly", "effect": "allow", "owner": "workshop-staff",
+      "tool": ["run_command"],
+      "argv": { "program": ["ls", "cat", "grep", "echo", "pwd", "uname", "date", "head", "wc"] },
+      "rationale": "read-only programs; arguments are passed as literal argv, never expanded by a shell"
+    },
+    {
+      "id": "P-git-readonly", "effect": "allow", "owner": "workshop-staff",
+      "tool": ["run_command"],
+      "argv": { "program": ["git"], "subcommand": ["status", "diff", "log", "rev-parse", "branch", "show"] },
+      "rationale": "read-only git subcommands, recognised after skipping global options (-C, -c, --git-dir)"
+    },
+    {
+      "id": "P-git-mutating", "effect": "ask", "owner": "workshop-staff",
+      "tool": ["run_command"],
+      "argv": { "program": ["git"], "subcommand": ["add", "commit", "checkout", "clone", "reset"] },
+      "rationale": "changes the local checkout; approval is scoped to this exact subcommand, not to run_command",
+      "scope": "argv-prefix"
+    }
+  ]
+}
