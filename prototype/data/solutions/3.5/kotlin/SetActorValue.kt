@@ -21,7 +21,7 @@ object SetActorValue : Tool {
         .string("value", "The new value, like 80")
         .build()
 
-    override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
+    override fun BROKEN_TYPE_ERROR(execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
         val actor = input.string("actor").trim()
         val trait = input.string("trait").trim()
         val key = input.string("key").trim()
