@@ -220,6 +220,9 @@ class DelegationBridgeTest {
             com.jdriven.harness.api.ToolContext("r", 1, "t", LocalWorkspace(dir)) { },
         )
         assertTrue(outcome is com.jdriven.harness.api.ToolOutcome.Failure, "expected a failure, got $outcome")
-        assertTrue((outcome as com.jdriven.harness.api.ToolOutcome.Failure).message.contains("unavailable"), outcome.message)
+        // The wording belongs to whichever tool the bundle registered, so assert the contract: it failed,
+        // and it said the runner is what was missing rather than pretending the sub-agent ran.
+        val message = (outcome as com.jdriven.harness.api.ToolOutcome.Failure).message
+        assertTrue(message.contains("runner", ignoreCase = true), message)
     }
 }
