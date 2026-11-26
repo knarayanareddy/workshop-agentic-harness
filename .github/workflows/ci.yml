@@ -110,7 +110,8 @@ jobs:
             echo "::error::gradle build failed (exit $status)"
             # compiler errors, test failures and the first lines of the report
             # npm errors are reported as "npm error ...", tsc errors as "error TSxxxx", Kotlin as "e: "
-            grep -nE "^e: |error TS|npm error|^npm ERR|Error: |Execution failed|> Task .* FAILED|Caused by" /tmp/gradle.log \
+            # test failures print as "TestClass > test name FAILED" or "expected: <..> but was: <..>"
+            grep -nE "^e: |error TS|npm error|^npm ERR|Error: |Execution failed|> Task .* FAILED|Caused by| FAILED$|expected:|AssertionFailedError|org\.opentest4j" /tmp/gradle.log \
               | head -40 | while IFS= read -r line; do echo "::error::$line"; done
           fi
           exit "$status"
