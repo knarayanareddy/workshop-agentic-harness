@@ -9,6 +9,8 @@
     "types": [],
     "strict": true,
     "noEmit": true,
+    // v2 policy ships as JSON data; the bundle imports it, so the compiler must understand it
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "paths": {
       "@harness/api": ["../../harness-api/typescript/harness.ts"]

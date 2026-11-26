@@ -4,6 +4,7 @@ import com.jdriven.harness.api.AgentEvent
 import com.jdriven.harness.api.AgentEventListener
 import com.jdriven.harness.api.ApprovalDecision
 import com.jdriven.harness.api.ApprovalHandler
+import com.jdriven.harness.api.ApprovalScope
 import com.jdriven.harness.api.ContentBlock
 import com.jdriven.harness.api.Guardrail
 import com.jdriven.harness.api.InferenceResponse
@@ -212,5 +213,115 @@ class AgentTest {
         assertTrue((repaired[0] as ContentBlock.ToolResult).isError)
         assertEquals("again", (repaired[1] as ContentBlock.Text).text)
         assertEquals("second", (result as AgentResult.Completed).text)
+    }
+
+    // ---- v2: scoped approvals (REVIEW C2) -----------------------------------------------------------
+
+    /** A guardrail that always asks, and states the scope it wants the approval to cover. */
+    private fun scopedAsker(scope: (ToolCall) -> ApprovalScope) = object : Guardrail {
+        override val name = "scoped-asker"
+        override fun beforeToolUse(call: ToolCall, ctx: TurnContext) = ToolDecision.Ask("check this")
+        override fun approvalScope(call: ToolCall, reasons: List<String>) = scope(call)
+    }
+
+    private fun argvOf(call: ToolCall): List<String> =
+        call.input.json["argv"]?.let { (it as kotlinx.serialization.json.JsonArray).map { a -> (a as JsonPrimitive).content } } ?: emptyList()
+
+    private fun argv(vararg a: String) = JsonObject(mapOf("argv" to kotlinx.serialization.json.JsonArray(a.map { JsonPrimitive(it) })))
+
+    @Test
+    fun `without a scope, approve-always still covers the whole tool (v1 behaviour is unchanged)`() {
+        val model = ScriptedModelClient(
+            listOf(toolUse("echo" to input("a")), toolUse("echo" to input("b")), text("done")),
+        )
+        val asker = object : Guardrail {
+            override val name = "asker"
+            override fun beforeToolUse(call: ToolCall, ctx: TurnContext) = ToolDecision.Ask("check")
+        }
+        val agent = agent(model, guardrails = listOf(asker), approval = ApprovalDecision.ApproveAlways)
+        agent.run("go")
+        assertEquals(1, approvals.size, "v1: one 'always' silences every later call of the tool")
+    }
+
+    @Test
+    fun `an argv scope grants the same prefix again and asks again for a different subcommand`() {
+        val scope = scopedAsker {
+            ApprovalScope.ArgvPrefix("echo", argvOf(it).take(1))
+        }
+        val model = ScriptedModelClient(
+            listOf(
+                toolUse("echo" to argv("git", "status")),
+                toolUse("echo" to argv("git", "status")),
+                toolUse("echo" to argv("git", "push")),
+                text("done"),
+            ),
+        )
+        val agent = agent(model, guardrails = listOf(scope), approval = ApprovalDecision.ApproveAlways)
+        agent.run("go")
+        // first asks; second is covered by the remembered prefix; third is NOT covered
+        assertEquals(2, approvals.size, "the scoped grant must not authorise a different subcommand")
+    }
+
+    @Test
+    fun `a directory scope covers that directory and below, not a sibling`() {
+        fun write(path: String) = JsonObject(mapOf("path" to JsonPrimitive(path)))
+        val scope = scopedAsker { call ->
+            val path = call.input.json["path"]!!.let { (it as JsonPrimitive).content }
+            ApprovalScope.Directory(call.tool.name, path.substringBeforeLast('/', "."))
+        }
+        val model = ScriptedModelClient(
+            listOf(
+                toolUse("echo" to write("OpenRA/mods/ra/rules/a.yaml")),
+                toolUse("echo" to write("OpenRA/mods/ra/rules/deep/b.yaml")),
+                toolUse("echo" to write("OpenRA/glsl/c.frag")),
+                text("done"),
+            ),
+        )
+        val agent = agent(model, guardrails = listOf(scope), approval = ApprovalDecision.ApproveAlways)
+        agent.run("go")
+        assertEquals(2, approvals.size, "same directory and below are covered; the sibling is not")
+    }
+
+    @Test
+    fun `Once never remembers anything`() {
+        val scope = scopedAsker { ApprovalScope.Once }
+        val model = ScriptedModelClient(
+            listOf(toolUse("echo" to input("a")), toolUse("echo" to input("b")), text("done")),
+        )
+        val agent = agent(model, guardrails = listOf(scope), approval = ApprovalDecision.ApproveAlways)
+        agent.run("go")
+        assertEquals(2, approvals.size, "approve-always with a Once scope must still ask next time")
+    }
+
+    @Test
+    fun `a guardrail that throws while stating its scope remembers nothing (fail closed)`() {
+        val scope = scopedAsker { throw IllegalStateException("boom") }
+        val model = ScriptedModelClient(
+            listOf(toolUse("echo" to input("a")), toolUse("echo" to input("b")), text("done")),
+        )
+        val agent = agent(model, guardrails = listOf(scope), approval = ApprovalDecision.ApproveAlways)
+        agent.run("go")
+        assertEquals(2, approvals.size, "a broken scope must degrade to once-only, not to a blanket grant")
+        assertTrue(events.any { it is AgentEvent.Warning && "approval scope" in it.message })
+    }
+
+    @Test
+    fun `the approval request carries the scope, so a UI can show what it covers`() {
+        val seen = mutableListOf<com.jdriven.harness.api.ApprovalRequest>()
+        val scope = scopedAsker { ApprovalScope.ArgvPrefix("echo", listOf("git", "status")) }
+        val model = ScriptedModelClient(listOf(toolUse("echo" to argv("git", "status")), text("done")))
+        val agent = Agent(
+            model = model,
+            systemPrompt = listOf(SystemPromptSection.Static("base", "You are a test.")),
+            tools = listOf(echoTool()),
+            guardrails = listOf(scope),
+            approvalHandler = ApprovalHandler { seen += it; ApprovalDecision.Approve },
+            listeners = listOf(AgentEventListener { events += it }),
+            workspace = LocalWorkspace(dir),
+            config = AgentConfig(maxIterations = 5, maxTurnContinuations = 2),
+        )
+        agent.run("go")
+        assertEquals(1, seen.size)
+        assertEquals("argv:echo:git status", seen.single().scope.key)
     }
 }

@@ -71,6 +71,12 @@ jobs:
           cache-dependency-path: extensions/typescript/package-lock.json
       - run: npm ci
       - run: npm test
+      - name: Build both bundles (v1 and v2)
+        run: npm run build && npm run build:v2
+      - name: The shipped v2 bundle assembles and decides
+        # Re-runs the artefact-level test against the freshly built dist/, so CI fails if the JSON
+        # policy stops reaching the bundle or the export shape breaks.
+        run: npx vitest run test/v2/shipped-bundle.test.ts
 
   # ITEM 5. Compiles all 48 Kotlin/Java solutions by placing them in their exercise packages.
   # Placement is derived from each file's own `package` line (prototype/scripts/place-solutions.mjs),

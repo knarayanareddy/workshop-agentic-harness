@@ -5,6 +5,7 @@ import com.jdriven.harness.api.AgentEventListener
 import com.jdriven.harness.api.ApprovalDecision
 import com.jdriven.harness.api.ApprovalHandler
 import com.jdriven.harness.api.ApprovalRequest
+import com.jdriven.harness.api.ApprovalScope
 import com.jdriven.harness.api.ContentBlock
 import com.jdriven.harness.api.EventSink
 import com.jdriven.harness.api.Guardrail
@@ -64,6 +65,10 @@ class Agent(
     private val dynamicSections = systemPrompt.filterIsInstance<SystemPromptSection.Dynamic>()
     private val lastDynamicValue = mutableMapOf<String, String>()
 
+    // v2: scope keys ("tool:run_command", "argv:run_command:git status", "dir:write_file:OpenRA/mods"),
+    // not tool names. A guardrail that implements approvalScope narrows what one "always" covers, which
+    // closes REVIEW C2: in v1 one `a` on run_command approved every later command. With no scope it is
+    // still ApprovalScope.WholeTool, i.e. v1's behaviour, so nothing changes for existing bundles.
     private val approvedAlways = mutableSetOf<String>()
     private val history = mutableListOf<Message>()
 
@@ -197,15 +202,16 @@ class Agent(
 
         // [ExtensionPoint] Guardrail.beforeToolUse — first Deny wins; Asks are collected (§5.1).
         val asks = mutableListOf<String>()
+        val askers = mutableListOf<Guardrail>()
         for (g in guardrails) {
             when (val d = guarded(runId, g, "beforeToolUse", { ToolDecision.Deny("guardrail '${g.name}' failed: ${it.describe()}") }) { g.beforeToolUse(call, ctx) }) {
                 ToolDecision.Allow -> Unit
-                is ToolDecision.Ask -> asks += d.reason
+                is ToolDecision.Ask -> { asks += d.reason; askers += g }
                 is ToolDecision.Deny -> return ContentBlock.ToolResult(use.id, "Denied by guardrail '${g.name}': ${d.reason}", isError = true)
             }
         }
         if (asks.isNotEmpty()) {
-            denialByHuman(call, asks, runId)?.let { reason ->
+            denialByHuman(call, asks, askers, runId)?.let { reason ->
                 return ContentBlock.ToolResult(use.id, "Denied by the user: $reason", isError = true)
             }
         }
@@ -235,21 +241,59 @@ class Agent(
     }
 
     /** Consults the [ApprovalHandler] once with all reasons; returns the denial reason, or null if approved. */
-    private fun denialByHuman(call: ToolCall, reasons: List<String>, runId: String): String? {
-        if (call.tool.name in approvedAlways) {
-            events.emit(AgentEvent.ApprovalRequested(runId, call.tool.name, reasons, "approved (always, for this session)"))
+    private fun denialByHuman(call: ToolCall, reasons: List<String>, askers: List<Guardrail>, runId: String): String? {
+        // The first guardrail with an opinion decides the scope; none means v1's whole-tool behaviour.
+        val scope = askers.firstNotNullOfOrNull { g ->
+            try {
+                g.approvalScope(call, reasons)
+            } catch (e: Exception) {
+                // fail closed: a guardrail that cannot say what it is approving remembers nothing
+                events.emit(AgentEvent.Warning(runId, "guardrail '${g.name}' failed to state an approval scope (${e.describe()}); approving once only"))
+                ApprovalScope.Once
+            }
+        } ?: ApprovalScope.WholeTool(call.tool.name)
+
+        // A remembered approval covers a call when its key is already granted AND the call is still in
+        // scope: `argv:run_command:git status` must not authorise `git push`.
+        val covering = approvedAlways.firstOrNull { key -> covers(key, scope) }
+        if (covering != null) {
+            val kind = covering.substringBefore(':')
+            events.emit(AgentEvent.ApprovalRequested(runId, call.tool.name, reasons, "approved (always, for this $kind scope)"))
             return null
         }
         val decision = try {
-            approvalHandler.request(ApprovalRequest(call, reasons))
+            approvalHandler.request(ApprovalRequest(call, reasons, scope))
         } catch (e: Exception) {
             ApprovalDecision.Deny("approval handler failed: ${e.describe()}")
         }
         events.emit(AgentEvent.ApprovalRequested(runId, call.tool.name, reasons, decision.toString()))
         return when (decision) {
             ApprovalDecision.Approve -> null
-            ApprovalDecision.ApproveAlways -> { approvedAlways += call.tool.name; null }
+            ApprovalDecision.ApproveAlways -> {
+                if (scope != ApprovalScope.Once) approvedAlways += scope.key
+                null
+            }
             is ApprovalDecision.Deny -> decision.reason
+        }
+    }
+
+    /**
+     * Whether a remembered approval [remembered] covers the current [now]. Deliberately strict:
+     *  - the same key always covers;
+     *  - an argv approval covers an argv call whose prefix it starts with, and nothing else;
+     *  - a directory approval covers a call in that directory or below;
+     *  - a whole-tool approval covers everything for that tool (v1), but a narrower one never widens.
+     */
+    private fun covers(remembered: String, now: ApprovalScope): Boolean {
+        fun parts(key: String) = key.split(':', limit = 3)
+        val (rKind, rTool, rRest) = parts(remembered)
+        val (nKind, nTool, nRest) = parts(now.key)
+        if (rTool != nTool) return false
+        return when (rKind) {
+            "tool" -> true // v1's whole-tool grant still applies (opt-in bundles cannot regress)
+            "argv" -> nKind == "argv" && nRest.startsWith(rRest)
+            "dir" -> nKind == "dir" && (nRest == rRest || nRest.startsWith("$rRest/"))
+            else -> false
         }
     }
 

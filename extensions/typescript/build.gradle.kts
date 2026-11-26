@@ -29,19 +29,21 @@ val tscErrors = "type errors such as\n" +
     "    src/systemprompt/defaults/role.ts(12,5): error TS2322: Type 'string' is not assignable to type 'number'.\n" +
     "(file, line and column)"
 
+// Two bundles: the v1 extension (always) and the v2 layer (used when HARNESS_V2=1).
 val bundle = tasks.register<NpmTask>("bundle") {
     group = "build"
-    description = "Type-checks and bundles src/ into dist/extension.js"
+    description = "Type-checks, then bundles src/ into dist/extension.js and src/v2/ into dist/extension-v2.js"
     dependsOn(tasks.npmInstall)
-    args = listOf("run", "build")
+    args = listOf("run", "typecheck", "bundle:v2", "bundle")
     inputs.dir("src")
+    inputs.dir("policy")
     inputs.dir(rootProject.file("harness-api/typescript"))
     inputs.files("package.json", "tsconfig.json")
-    val output = file("dist/extension.js")
-    outputs.file(output)
-    // Remove the previous bundle first: after a failed build there is no bundle, rather than a stale one that the
+    val outputs2 = listOf(file("dist/extension.js"), file("dist/extension-v2.js"))
+    outputs.files(outputs2)
+    // Remove the previous bundles first: after a failed build there is no bundle, rather than a stale one that the
     // harness would silently keep running.
-    doFirst { output.delete() }
+    doFirst { outputs2.forEach { it.delete() } }
     failClearly("The TypeScript build (type-check + bundle)", "$tscErrors.")
 }
 
@@ -55,6 +57,7 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     args = listOf("test")
     inputs.dir("src")
     inputs.dir("test")
+    inputs.dir("policy")
     inputs.dir(rootProject.file("harness-api/typescript"))
     inputs.files("package.json", "tsconfig.json", "tsconfig.test.json", "vitest.config.mts")
     outputs.upToDateWhen { true } // no outputs of its own: up to date while the inputs are unchanged
