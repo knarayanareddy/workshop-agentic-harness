@@ -203,13 +203,23 @@ class DelegationBridgeTest {
     }
 
     @Test
-    fun `delegation without a model fails honestly instead of pretending`() {
-        TypeScriptExtensions.useModel(null)
-        // With no MODEL_API_KEY in the test environment, defaultModel() is null, so there is no runner.
-        val env = System.getenv("MODEL_API_KEY")
-        if (!env.isNullOrBlank()) return // a developer machine with a key set: nothing to assert here
-        val bundle = load()
-        val runtime = bundle.runtime
-        assertTrue(runtime.subAgentRunner(SubAgentSpec("explorer", "", listOf("peek"), 3), LocalWorkspace(dir)) == null)
+    fun `delegation without a runner fails honestly instead of pretending`() {
+        // There is no supported way to say "no model at all" from a test, because a null injection means
+        // "use the default". So assert the path the model actually takes when no runner can be built: the
+        // bundle is loaded with no declared agents, which is what a session without delegation looks like.
+        val noAgents = script.replace('subAgents: SUB_AGENTS,', 'subAgents: [],')
+        val bundle = load(noAgents)
+        assertTrue(
+            bundle.runtime.subAgentRunner(SubAgentSpec("explorer", "", listOf("peek"), 3), LocalWorkspace(dir)) == null,
+            "an undeclared agent must get no runner",
+        )
+        // And the capability itself is not advertised to the tool, so it cannot pretend to delegate.
+        val delegate = bundle.tools.first { it.name == "delegate" }
+        val outcome = delegate.execute(
+            com.jdriven.harness.api.ToolInput(JsonObject(mapOf("agent" to JsonPrimitive("explorer"), "task" to JsonPrimitive("look")))),
+            com.jdriven.harness.api.ToolContext("r", 1, "t", LocalWorkspace(dir)) { },
+        )
+        assertTrue(outcome is com.jdriven.harness.api.ToolOutcome.Failure, "expected a failure, got $outcome")
+        assertTrue((outcome as com.jdriven.harness.api.ToolOutcome.Failure).message.contains("unavailable"), outcome.message)
     }
 }

@@ -28,8 +28,11 @@ object TypeScriptExtensions {
      */
     private fun defaultModel(): ModelClient? {
         if (System.getenv("MODEL_API_KEY").isNullOrBlank()) return null
-        // OpenAiModelClient IS the ModelClient; `.model` is the model NAME, which is why CI caught this.
-        return OpenAiModelClient()
+        // A key being present is not enough: the client must be constructible, and a test that never
+        // cleared an injected model must not reach the network by accident.
+        return runCatching { OpenAiModelClient() }
+            .onFailure { System.err.println("[warn] delegation is unavailable: the model client could not be created (${it.message})") }
+            .getOrNull()
     }
 
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
