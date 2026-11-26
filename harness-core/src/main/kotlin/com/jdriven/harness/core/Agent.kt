@@ -285,7 +285,11 @@ class Agent(
      *  - a whole-tool approval covers everything for that tool (v1), but a narrower one never widens.
      */
     private fun covers(remembered: String, now: ApprovalScope): Boolean {
-        fun parts(key: String) = key.split(':', limit = 3)
+        // split with a limit yields 2 parts for "tool:echo", so index instead of destructuring a list
+        fun parts(key: String): Triple<String, String, String> {
+            val p = key.split(':', limit = 3)
+            return Triple(p.getOrElse(0) { "" }, p.getOrElse(1) { "" }, p.getOrElse(2) { "" })
+        }
         val (rKind, rTool, rRest) = parts(remembered)
         val (nKind, nTool, nRest) = parts(now.key)
         if (rTool != nTool) return false

@@ -246,7 +246,8 @@ class AgentTest {
     @Test
     fun `an argv scope grants the same prefix again and asks again for a different subcommand`() {
         val scope = scopedAsker {
-            ApprovalScope.ArgvPrefix("echo", argvOf(it).take(1))
+            // prefix = the program AND the subcommand, so `git status` is not `git push`
+            ApprovalScope.ArgvPrefix("echo", argvOf(it).take(2))
         }
         val model = ScriptedModelClient(
             listOf(
