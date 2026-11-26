@@ -28,8 +28,8 @@ object TypeScriptExtensions {
      */
     private fun defaultModel(): ModelClient? {
         if (System.getenv("MODEL_API_KEY").isNullOrBlank()) return null
-        // One client per delegated run is not needed: a conversation is per Agent, not per client.
-        return OpenAiModelClient().model
+        // OpenAiModelClient IS the ModelClient; `.model` is the model NAME, which is why CI caught this.
+        return OpenAiModelClient()
     }
 
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
