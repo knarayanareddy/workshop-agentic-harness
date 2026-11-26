@@ -15,6 +15,8 @@ import kotlin.system.exitProcess
 
 private val EXIT_COMMANDS = setOf("exit", "quit", "/exit", "/quit")
 private const val LANGUAGE_ENV = "HARNESS_LANGUAGE"
+/** v2 is opt-in. The workshop teaches v1; `HARNESS_V2=1` swaps in the v2 TypeScript bundle. */
+private const val V2_ENV = "HARNESS_V2"
 
 /**
  * §7 Assembly. This file is the whole agent: it picks the bundle that lists every section of the system prompt,
@@ -101,13 +103,25 @@ private fun harnessLanguage(): Language {
     }
 }
 
+/**
+ * v2 is TypeScript-only for now: the policy engine, skills, compaction and audit are all extensions,
+ * and only the TypeScript module has them. Choosing v2 with another language is a clear error rather
+ * than a silently v1 session.
+ */
 private fun loadTypeScript(workspace: Workspace): ExtensionBundle {
-    val bundle = Path("extensions/typescript/dist/extension.js")
+    val v2 = System.getenv(V2_ENV)?.trim()?.let { it == "1" || it.equals("true", ignoreCase = true) } ?: false
+    val language = harnessLanguage()
+    if (v2 && language != Language.TYPESCRIPT) {
+        println(Ansi.red("[error] $V2_ENV=1 needs $LANGUAGE_ENV=typescript (v2 extensions exist only in TypeScript); got ${language.envValue}"))
+        exitProcess(1)
+    }
+    val bundle = Path(if (v2) "extensions/typescript/dist/extension-v2.js" else "extensions/typescript/dist/extension.js")
     val howToBuild = "start the harness with `./gradlew :app:run`, which builds it and shows any TypeScript errors"
     if (!bundle.exists()) {
         println(Ansi.red("[error] $bundle not found - the TypeScript build has not run or has failed; $howToBuild"))
         exitProcess(1)
     }
+    if (v2) println(Ansi.dim("v2 extensions: policy as data, argv runner, skills, compaction, audit"))
     return try {
         TypeScriptExtensions.load(bundle, workspace)
     } catch (e: TypeScriptExtensionException) {

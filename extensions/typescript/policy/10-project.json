@@ -1,0 +1,33 @@
+{
+  "policy": "project-overrides",
+  "layer": "10-project",
+  "version": 1,
+  "owner": "project",
+  "rules": [
+    {
+      "id": "P-protect-shaders",
+      "effect": "deny",
+      "owner": "project",
+      "tool": ["write_file", "edit_file"],
+      "path": ["OpenRA/glsl/**"],
+      "rationale": "the shader is not part of the lesson; edit it deliberately by hand",
+      "suggest": "Change mod data under OpenRA/mods/ instead."
+    },
+    {
+      "id": "P-edit-mod-data",
+      "effect": "ask",
+      "owner": "project",
+      "tool": ["write_file", "edit_file"],
+      "path": ["OpenRA/mods/**"],
+      "rationale": "changes mod data; the approval shows the diff and the scope"
+    },
+    {
+      "id": "P-write-elsewhere",
+      "effect": "ask",
+      "owner": "project",
+      "tool": ["write_file", "edit_file"],
+      "path_not": ["OpenRA/mods/**", "out/**", "notes/**", "AGENTS.md"],
+      "rationale": "write outside the mod directories: confirm that is intended"
+    }
+  ]
+}

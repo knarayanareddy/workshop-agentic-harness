@@ -71,6 +71,12 @@ jobs:
           cache-dependency-path: extensions/typescript/package-lock.json
       - run: npm ci
       - run: npm test
+      - name: Build both bundles (v1 and v2)
+        run: npm run build && npm run build:v2
+      - name: The shipped v2 bundle assembles and decides
+        # Re-runs the artefact-level test against the freshly built dist/, so CI fails if the JSON
+        # policy stops reaching the bundle or the export shape breaks.
+        run: npx vitest run test/v2/shipped-bundle.test.ts
 
   # ITEM 5. Compiles all 48 Kotlin/Java solutions by placing them in their exercise packages.
   # Placement is derived from each file's own `package` line (prototype/scripts/place-solutions.mjs),
@@ -94,7 +100,33 @@ jobs:
         run: node prototype/scripts/place-solutions.mjs verify .
       # No `--offline`: unlike the prototype, this needs the Kotlin/Java toolchains from Maven Central.
       - name: Compile Kotlin and Java (with the repo's own tests)
-        run: ./gradlew build --no-daemon
+        # Gradle's failure text is the useful part, and workflow logs are not always reachable, so put
+        # compiler errors into annotations, which `gh run view` and the PR page both show.
+        run: |
+          set +e
+          ./gradlew build --no-daemon 2>&1 | tee /tmp/gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" != "0" ]; then
+            echo "::error::gradle build failed (exit $status)"
+            # compiler errors, test failures and the first lines of the report
+            # npm errors are reported as "npm error ...", tsc errors as "error TSxxxx", Kotlin as "e: "
+            # test failures print as "TestClass > test name FAILED" or "expected: <..> but was: <..>"
+            grep -nE "^e: |error TS|npm error|^npm ERR|Error: |Execution failed|> Task .* FAILED|Caused by| FAILED$|expected:|AssertionFailedError|org\.opentest4j" /tmp/gradle.log \
+              | head -40 | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+          exit "$status"
+      - name: Report what the JVM suites ran
+        if: always()
+        run: |
+          # The test XML is the only durable evidence of how many tests actually executed.
+          total=0; failed=0
+          for f in $(find . -path "*build/test-results*" -name "*.xml"); do
+            t=$(grep -o 'tests="[0-9]*"' "$f" | head -1 | grep -o '[0-9]*')
+            fl=$(grep -o 'failures="[0-9]*"' "$f" | head -1 | grep -o '[0-9]*')
+            total=$((total + ${t:-0})); failed=$((failed + ${fl:-0}))
+          done
+          echo "::notice::JVM tests executed: $total, failures: $failed"
+          echo "JVM tests executed: $total (failures: $failed)"
       - name: Clean up the placed solutions
         if: always()
         run: node prototype/scripts/place-solutions.mjs clean .
