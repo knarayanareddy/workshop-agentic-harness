@@ -1,6 +1,5 @@
 package com.jdriven.harness.core
 
-import com.jdriven.harness.api.AgentConfig
 import com.jdriven.harness.api.AgentRuntime
 import com.jdriven.harness.api.ApprovalDecision
 import com.jdriven.harness.api.ApprovalHandler
@@ -14,8 +13,8 @@ import com.jdriven.harness.api.SubAgentRunner
 import com.jdriven.harness.api.SubAgentSpec
 import com.jdriven.harness.api.SystemPromptSection
 import com.jdriven.harness.api.Tool
-import com.jdriven.harness.api.ToolInput
 import com.jdriven.harness.api.ToolContext
+import com.jdriven.harness.api.ToolInput
 import com.jdriven.harness.api.ToolOutcome
 import com.jdriven.harness.api.Workspace
 import kotlinx.serialization.json.JsonPrimitive
