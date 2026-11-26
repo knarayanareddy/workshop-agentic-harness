@@ -3,10 +3,29 @@
 // right; this proves the thing that ships is right, including the JSON policy that only exists at
 // bundle time.
 import { existsSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { nodeWorkspace } from "../support/host";
 
 const BUNDLE = new URL("../../dist/extension-v2.js", import.meta.url).pathname;
+const V2_ENTRY = new URL("../../src/v2/index.ts", import.meta.url).pathname;
+
+/**
+ * `npm test` must work from a clean checkout, where dist/ has not been built yet, so build the bundle
+ * here if it is missing. CI additionally builds and re-runs this file, so the artefact is checked
+ * both ways. Bundling with the same esbuild settings as `npm run bundle:v2` keeps the two honest.
+ */
+async function ensureBundle(): Promise<void> {
+  if (existsSync(BUNDLE)) return;
+  const esbuild = await import("esbuild");
+  await esbuild.build({
+    entryPoints: [V2_ENTRY],
+    bundle: true,
+    format: "iife",
+    globalName: "__harnessExtension",
+    target: "es2022",
+    outfile: BUNDLE,
+  });
+}
 
 interface Shipped {
   systemPrompt: { kind: string; name: string; text?: string }[];
@@ -25,9 +44,15 @@ function load(): Shipped {
   return fn({ workspace: nodeWorkspace(), exec: () => ({ exitCode: 0, output: "", timedOut: false }) });
 }
 
-describe.skipIf(!existsSync(BUNDLE))("the shipped v2 bundle", () => {
-  const ext = load();
-  const policy = ext.guardrails.find((g) => g.name === "policy")!;
+describe("the shipped v2 bundle", () => {
+  
+  let ext: Shipped;
+  let policy: Shipped["guardrails"][number];
+  beforeAll(async () => {
+    await ensureBundle();
+    ext = load();
+    policy = ext.guardrails.find((g) => g.name === "policy")!;
+  });
   const decide = async (tool: string, input: Record<string, unknown>) =>
     (await (policy.beforeToolUse as (c: unknown, x: unknown) => Promise<{ kind: string }>)({ id: "1", tool: { name: tool, description: "" }, input }, {})) as { kind: string };
 
