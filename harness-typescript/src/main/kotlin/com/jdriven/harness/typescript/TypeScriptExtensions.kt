@@ -106,6 +106,15 @@ object TypeScriptExtensions {
             val declared = ext.getMember("runtime")?.takeUnless { it.isNull }
             declaredAgents = rt.subAgentSpecs(declared)
             bundleTools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]", declared) }
+            // A sub-agent's tool list must be satisfiable by this bundle. Caught here rather than at
+            // run time, and rather than by silently giving the child fewer tools than it was told it has.
+            val registered = bundleTools.map { it.name }.toSet()
+            declaredAgents.forEach { spec ->
+                val missing = spec.tools.filterNot { it in registered }
+                if (missing.isNotEmpty()) {
+                    throw TypeScriptExtensionException("$bundleName sub-agent '${spec.name}' names tools this bundle does not register: $missing")
+                }
+            }
             bundleGuardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") }
             return ExtensionBundle(
                 systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },

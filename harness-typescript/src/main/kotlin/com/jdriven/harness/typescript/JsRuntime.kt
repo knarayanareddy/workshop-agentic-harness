@@ -168,8 +168,8 @@ internal class JsRuntime(val context: Context, val bundleName: String) {
      */
     fun delegate(runner: (SubAgentSpec) -> SubAgentRunner?): ProxyExecutable = fn { args ->
         val spec = try {
-            specOf(args.firstOrNull() ?: throw IllegalArgumentException("delegate(spec, prompt) needs a spec"))
-        } catch (e: IllegalArgumentException) {
+            specOf(args.firstOrNull() ?: throw TypeScriptExtensionException("delegate(spec, prompt) needs a spec"))
+        } catch (e: TypeScriptExtensionException) {
             return@fn ProxyObject.fromMap(mapOf("kind" to "failed", "reason" to "invalid sub-agent spec: ${e.message}"))
         }
         val prompt = args.getOrNull(1)?.takeIf { it.isString }?.asString() ?: ""
@@ -187,20 +187,20 @@ internal class JsRuntime(val context: Context, val bundleName: String) {
 
     /** Reads a [SubAgentSpec] out of plain JSON, with the defaults and checks the loop relies on. */
     private fun specOf(value: Value): SubAgentSpec {
-        if (!value.hasMembers()) throw IllegalArgumentException("spec must be an object")
+        if (!value.hasMembers()) throw TypeScriptExtensionException("a sub-agent spec must be an object")
         fun text(member: String): String? = value.getMember(member)?.takeIf { it.isString }?.asString()
-        val name = text("name")?.takeIf { it.isNotBlank() } ?: throw IllegalArgumentException("spec.name is required")
+        val name = text("name")?.takeIf { it.isNotBlank() } ?: throw TypeScriptExtensionException("spec.name is required")
         val description = text("description") ?: ""
-        val toolsMember = value.getMember("tools") ?: throw IllegalArgumentException("spec.tools is required")
-        if (!toolsMember.hasArrayElements()) throw IllegalArgumentException("spec.tools must be an array")
+        val toolsMember = value.getMember("tools") ?: throw TypeScriptExtensionException("spec.tools is required")
+        if (!toolsMember.hasArrayElements()) throw TypeScriptExtensionException("spec.tools must be an array")
         val tools = (0 until toolsMember.arraySize).map {
             val t = toolsMember.getArrayElement(it)
-            if (!t.isString) throw IllegalArgumentException("spec.tools must contain strings")
+            if (!t.isString) throw TypeScriptExtensionException("spec.tools must contain strings")
             t.asString()
         }
         val iterations = value.getMember("maxIterations")?.takeIf { it.fitsInInt() }?.asInt() ?: 6
         // A budget of 0 would make every sub-agent fail immediately; refuse it here rather than in the loop.
-        if (iterations < 1) throw IllegalArgumentException("spec.maxIterations must be at least 1")
+        if (iterations < 1) throw TypeScriptExtensionException("spec.maxIterations must be at least 1")
         return SubAgentSpec(name, description, tools, iterations)
     }
 

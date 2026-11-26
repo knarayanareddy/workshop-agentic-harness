@@ -61,8 +61,17 @@ class DelegationBridgeTest {
         })};
     """.trimIndent()
 
-    private fun load(script: String = this.script): com.jdriven.harness.api.ExtensionBundle =
-        TypeScriptExtensions.loadScript(script, LocalWorkspace(dir))
+    /**
+     * Delegated runs use [model] (scripted) rather than the API client, so these tests need no API key and
+     * no network. The runner captures the model while the bundle loads, so a test that wants a specific
+     * sequence must set it BEFORE calling [load].
+     */
+    private var model: ScriptedModelClient = ScriptedModelClient(listOf(text("no model was configured for this test")))
+
+    private fun load(script: String = this.script): com.jdriven.harness.api.ExtensionBundle {
+        TypeScriptExtensions.useModel(model)
+        return TypeScriptExtensions.loadScript(script, LocalWorkspace(dir))
+    }
 
     private fun path(value: String) = JsonObject(mapOf("path" to JsonPrimitive(value)))
 
@@ -96,8 +105,10 @@ class DelegationBridgeTest {
         val badMode = assertThrows<TypeScriptExtensionException> { load(script.replace("\"acceptEdits\"", "\"yolo\"")) }
         assertTrue(badMode.message!!.contains("yolo"), badMode.message)
 
-        val noTools = assertThrows<TypeScriptExtensionException> { load(script.replace("tools: [\"peek\"],", "")) }
-        assertTrue(noTools.message!!.contains("tools"), noTools.message)
+        // A spec naming a tool the bundle never registers: the child would silently have fewer tools
+        // than its description promises, so this is a load error.
+        val unknownTool = assertThrows<TypeScriptExtensionException> { load(script.replace("tools: [\"peek\"],", "tools: [\"nope\"],")) }
+        assertTrue(unknownTool.message!!.contains("nope"), unknownTool.message)
 
         val zeroBudget = assertThrows<TypeScriptExtensionException> { load(script.replace("maxIterations: 3", "maxIterations: 0")) }
         assertTrue(zeroBudget.message!!.contains("maxIterations"), zeroBudget.message)
@@ -105,21 +116,23 @@ class DelegationBridgeTest {
 
     @Test
     fun `delegate runs a real nested loop with the sub-agent's own tools and returns only its answer`() {
-        // One scripted client for both: the parent asks to delegate, then answers; the child reads, then answers.
-        val model = ScriptedModelClient(
+        // The child runs INSIDE the delegate call, so it speaks between the parent's first and second
+        // request: parent asks to delegate, child reads and answers, THEN the parent wraps up.
+        val scripted = ScriptedModelClient(
             listOf(
                 toolUse("delegate" to JsonObject(mapOf("task" to JsonPrimitive("look at a.txt")))),
-                text("parent is done"),
                 // ---- the child's two calls ----
                 toolUse("peek" to path("a.txt")),
                 text("a.txt says hello"),
+                // ---- back in the parent ----
+                text("parent is done"),
             ),
         )
-        TypeScriptExtensions.useModel(model)
+        model = scripted
         try {
             val bundle = load()
             val agent = Agent(
-                model = model,
+                model = scripted,
                 systemPrompt = bundle.systemPrompt,
                 tools = bundle.tools,
                 guardrails = bundle.guardrails,
@@ -154,19 +167,22 @@ class DelegationBridgeTest {
             ? { kind: "deny", reason: "peek is forbidden" }
             : { kind: "allow" },
         }],""")
-        val model = ScriptedModelClient(
+        val scripted = ScriptedModelClient(
             listOf(
                 toolUse("delegate" to JsonObject(mapOf("task" to JsonPrimitive("look")))),
-                text("parent is done"),
+                // the child asks for the forbidden tool, three times, until its own budget stops it
                 toolUse("peek" to path("a.txt")),
-                text("the child should never see this"),
+                toolUse("peek" to path("a.txt")),
+                toolUse("peek" to path("a.txt")),
+                // ---- back in the parent ----
+                text("parent is done"),
             ),
         )
-        TypeScriptExtensions.useModel(model)
+        model = scripted
         try {
             val bundle = load(denying)
             val agent = Agent(
-                model = model,
+                model = scripted,
                 systemPrompt = bundle.systemPrompt,
                 tools = bundle.tools,
                 guardrails = bundle.guardrails,
