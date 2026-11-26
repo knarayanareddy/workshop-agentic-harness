@@ -4,23 +4,50 @@
   "version": 1,
   "owner": "workshop-staff",
   "mode": "default",
-  "defaults": { "run_command": "deny" },
+  "defaults": {
+    "run_command": "deny"
+  },
   "rules": [
     {
       "id": "P-protected-files",
       "effect": "deny",
       "owner": "security",
-      "tool": ["read_file", "write_file", "edit_file", "list_files", "glob", "grep"],
-      "path": ["**/.env", "**/.env.*", "**/.git/**", "**/*.pem", "**/*.key", "**/id_rsa*"],
-      "except_path": ["**/.env.example"],
+      "tool": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_files",
+        "glob",
+        "grep"
+      ],
+      "path": [
+        "**/.env",
+        "**/.env.*",
+        "**/.git/**",
+        "**/*.pem",
+        "**/*.key",
+        "**/id_rsa*"
+      ],
+      "except_path": [
+        "**/.env.example"
+      ],
       "rationale": "may hold secrets or repository internals (same intent as v1 protected-paths)"
     },
     {
       "id": "P-build-files",
       "effect": "deny",
       "owner": "workshop-staff",
-      "tool": ["write_file", "edit_file"],
-      "path": ["**/build.gradle.kts", "**/settings.gradle.kts", "**/gradle.properties", "**/pom.xml", "**/package.json"],
+      "tool": [
+        "write_file",
+        "edit_file"
+      ],
+      "path": [
+        "**/build.gradle.kts",
+        "**/settings.gradle.kts",
+        "**/gradle.properties",
+        "**/pom.xml",
+        "**/package.json"
+      ],
       "rationale": "make the test pass, not the build. v1's build-file guardrail only inspects write_file, so edit_file could bypass it",
       "suggest": "Fix the code under test; leave build configuration to the user."
     },
@@ -28,8 +55,13 @@
       "id": "P-engine-code",
       "effect": "deny",
       "owner": "workshop-staff",
-      "tool": ["write_file", "edit_file"],
-      "path": ["OpenRA/**/*.cs"],
+      "tool": [
+        "write_file",
+        "edit_file"
+      ],
+      "path": [
+        "OpenRA/**/*.cs"
+      ],
       "rationale": "ground rule: mod through data (YAML/Lua), never the C# engine",
       "suggest": "Express the change as a rules override under OpenRA/mods/ra/."
     },
@@ -37,8 +69,13 @@
       "id": "P-plan-mode",
       "effect": "deny",
       "owner": "workshop-staff",
-      "tool": ["write_file", "edit_file"],
-      "modes": ["plan"],
+      "tool": [
+        "write_file",
+        "edit_file"
+      ],
+      "modes": [
+        "plan"
+      ],
       "rationale": "permission mode 'plan' is read-only",
       "suggest": "Ask for the change and leave plan mode first."
     },
@@ -46,8 +83,19 @@
       "id": "P-no-upstream",
       "effect": "deny",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["git"], "subcommand": ["push", "send-email", "request-pull"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "git"
+        ],
+        "subcommand": [
+          "push",
+          "send-email",
+          "request-pull"
+        ]
+      },
       "rationale": "upstream is a destination nobody here may write to; it is a local-only checkout",
       "suggest": "Leave changes uncommitted or commit locally; the user decides what happens next."
     },
@@ -55,8 +103,16 @@
       "id": "P-no-forge-cli",
       "effect": "deny",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["gh", "hub", "glab"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "gh",
+          "hub",
+          "glab"
+        ]
+      },
       "rationale": "forge CLIs open pull requests and call the GitHub API",
       "suggest": "There is no remote work to do in this workshop."
     },
@@ -64,8 +120,23 @@
       "id": "P-no-shells",
       "effect": "deny",
       "owner": "security",
-      "tool": ["run_command"],
-      "argv": { "program": ["sh", "bash", "zsh", "cmd", "powershell", "python", "python3", "node", "curl", "wget"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "sh",
+          "bash",
+          "zsh",
+          "cmd",
+          "powershell",
+          "python",
+          "python3",
+          "node",
+          "curl",
+          "wget"
+        ]
+      },
       "rationale": "an interpreter or downloader makes the argv boundary meaningless",
       "suggest": "Use a specific allow-listed program and pass arguments as argv."
     },
@@ -73,8 +144,12 @@
       "id": "P-outside-workspace",
       "effect": "deny",
       "owner": "security",
-      "tool": ["run_command"],
-      "argv": { "any_path_outside_workspace": true },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "any_path_outside_workspace": true
+      },
       "rationale": "an argument resolves outside the workspace (absolute path or ..)",
       "suggest": "Use paths relative to the workspace root."
     },
@@ -82,40 +157,110 @@
       "id": "P-readonly",
       "effect": "allow",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["ls", "cat", "grep", "echo", "pwd", "uname", "date", "head", "tail", "wc"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "ls",
+          "cat",
+          "grep",
+          "echo",
+          "pwd",
+          "uname",
+          "date",
+          "head",
+          "tail",
+          "wc"
+        ]
+      },
       "rationale": "read-only programs; arguments are passed as literal argv, never expanded by a shell"
     },
     {
       "id": "P-git-readonly",
       "effect": "allow",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["git"], "subcommand": ["status", "diff", "log", "rev-parse", "branch", "show"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "git"
+        ],
+        "subcommand": [
+          "status",
+          "diff",
+          "log",
+          "rev-parse",
+          "branch",
+          "show"
+        ]
+      },
       "rationale": "read-only git subcommands, recognised after skipping global options (-C, -c, --git-dir)"
     },
     {
       "id": "P-git-mutating",
       "effect": "ask",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["git"], "subcommand": ["add", "commit", "checkout", "reset", "clone", "stash"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "git"
+        ],
+        "subcommand": [
+          "add",
+          "commit",
+          "checkout",
+          "reset",
+          "clone",
+          "stash"
+        ]
+      },
       "rationale": "changes the local checkout; the approval names the exact subcommand, not the whole tool"
     },
     {
       "id": "P-toolbox",
       "effect": "ask",
       "owner": "workshop-staff",
-      "tool": ["run_command"],
-      "argv": { "program": ["docker", "openra-check", "openra-rules", "openra-build", "openra-package"] },
+      "tool": [
+        "run_command"
+      ],
+      "argv": {
+        "program": [
+          "docker",
+          "openra-check",
+          "openra-rules",
+          "openra-build",
+          "openra-package"
+        ]
+      },
       "rationale": "builds or launches the game; slow, and it writes outside the workspace"
     },
     {
       "id": "P-read-in-workspace",
       "effect": "allow",
       "owner": "workshop-staff",
-      "tool": ["read_file", "list_files", "glob", "grep", "file_stats"],
+      "tool": [
+        "read_file",
+        "list_files",
+        "glob",
+        "grep",
+        "file_stats"
+      ],
       "rationale": "reading is free; protected paths are denied by a rule that is stricter"
+    },
+    {
+      "id": "P-v2-local-tools",
+      "effect": "allow",
+      "owner": "workshop-staff",
+      "tool": [
+        "load_skill",
+        "list_agents"
+      ],
+      "rationale": "v2's own tools: loading a skill body and listing sub-agents touch no file and no program, so they cost nothing and can break nothing. Without this rule the default-deny would refuse them, which would silently disable progressive disclosure and delegation",
+      "suggest": "Nothing to change; these are the harness's own tools."
     }
   ]
 }

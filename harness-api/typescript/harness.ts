@@ -85,14 +85,64 @@ export interface ToolContext {
    * `exit code N` is added as the last line. No timeout. The JVM does the waiting: this engine has no threads.
    */
   spawn(command: string, log: string): void;
+  /**
+   * v2 — runs a delegated agent and waits for it. Present only when the harness provided a runner, so a
+   * tool must handle its absence. The sub-agent gets its own context and budget: only `text` comes back.
+   */
+  readonly delegate?: SubAgentDelegate;
 }
 
 // ---- §3 SystemPromptSection -------------------------------------------------------------------
 
+/**
+ * v2 — a delegated agent and what one run of it returns. Declared by the extension, run by the loop: a
+ * bundle cannot nest a loop, so it states the spec and the JVM does the rest.
+ */
+export interface SubAgentSpec {
+  readonly name: string;
+  readonly description: string;
+  readonly tools: string[];
+  readonly maxIterations: number;
+}
+
+export interface SubAgentOutcome {
+  readonly kind: "completed" | "failed";
+  readonly text?: string;
+  readonly reason?: string;
+  /** Inference calls the sub-agent made, in its own context. */
+  readonly calls?: number;
+  readonly iterations?: number;
+}
+
+export type SubAgentDelegate = (spec: SubAgentSpec, prompt: string) => SubAgentOutcome;
+
+/**
+ * v2 — what a bundle asks of the loop, returned from `Extension.runtime`. Everything is optional and
+ * defaults to v1. None of it is a guardrail: a guardrail may only tighten a decision, and every member
+ * here either loosens one (`approveEdits`) or needs a nested loop (`subAgents`).
+ */
+export interface AgentRuntimeSpec {
+  readonly mode?: "default" | "plan" | "acceptEdits";
+  readonly subAgents?: readonly SubAgentSpec[];
+  /**
+   * `acceptEdits` coverage. The loop consults this instead of asking the human, but only for calls the
+   * guardrails already decided to ASK about, and only when `mode` is `acceptEdits`. A DENY always wins.
+   */
+  readonly approveEdits?: (tool: string, input: Record<string, unknown>) => boolean;
+  /** Values checked between iterations: a token or call budget cannot be enforced inside one tool call. */
+  readonly budget?: Readonly<Record<string, number>>;
+}
+
 /** `name`: any unique identifier you like; shows up in the trace and labels dynamic sections. */
+/** Part of the frozen system prompt. Named so a helper can return one without the caller narrowing. */
+export interface StaticSection {
+  readonly kind: "static";
+  readonly name: string;
+  readonly text: string;
+}
+
 export type SystemPromptSection =
-  /** Part of the frozen system prompt. */
-  | { kind: "static"; name: string; text: string }
+  | StaticSection
   /** Recomputed before every inference call; appended to the conversation only when it changes. */
   | { kind: "dynamic"; name: string; render: (ctx: TurnContext) => Awaitable<string | null> };
 
@@ -176,6 +226,8 @@ export interface Extension {
   tools?: Tool[];
   guardrails?: Guardrail[];
   listeners?: AgentEventListener[];
+  /** v2 — what this bundle needs from the loop (delegation, acceptEdits, a budget). Defaults to v1. */
+  runtime?: AgentRuntimeSpec;
 }
 
 /** What the app hands the extension at assembly: what the role section is made of. */

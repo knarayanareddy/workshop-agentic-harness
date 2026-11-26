@@ -1,6 +1,7 @@
 package com.jdriven.harness.typescript
 
 import com.jdriven.harness.api.*
+import com.jdriven.harness.core.SubAgentLoops
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,6 +20,14 @@ import kotlin.io.path.name
 object TypeScriptExtensions {
     const val GLOBAL_NAME = "__harnessExtension"
 
+    /**
+     * v2 — the model a delegated run uses. Null when no API key is configured, and then delegation is
+     * reported as unavailable rather than attempted. A sub-agent needs its own conversation: one session
+     * is one transcript, and the child's is not the parent's.
+     */
+    private fun defaultModel(): ModelClient? =
+        if (System.getenv("MODEL_API_KEY").isNullOrBlank()) null else com.jdriven.harness.core.OpenAiModelClient().model
+
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
     const val SHELL_GLOBAL = "__harnessShell"
 
@@ -26,6 +35,15 @@ object TypeScriptExtensions {
      * [workspace] is the assembly context (`AssemblyContext` in harness.ts), handed to the
      * extension's default export, a function that builds the extension.
      */
+    /** Set by [useModel]: for tests, so a delegated run never needs an API key or the network. */
+    @Volatile
+    private var injectedModel: ModelClient? = null
+
+    /** Makes delegated runs use [client] instead of the API-backed one. Null restores the default. */
+    internal fun useModel(client: ModelClient?) {
+        injectedModel = client
+    }
+
     fun load(bundleFile: Path, workspace: Workspace): ExtensionBundle {
         val source = Source.newBuilder("js", bundleFile.toFile()).build()
         return load(source, bundleFile.name, workspace)
@@ -52,7 +70,8 @@ object TypeScriptExtensions {
             val export = global.takeIf { it.hasMember("default") }?.getMember("default") ?: global
             if (!export.canExecute()) throw TypeScriptExtensionException("$name: the default export must be a function (ctx) => extension")
             val ext = runtime.call("$name default export") { export.execute(assemblyContext(runtime, workspace)) }
-            return Adapter(runtime).bundle(ext)
+            // Resolved once per load: a sub-agent gets a new conversation, not a new HTTP client.
+            return Adapter(runtime, workspace, injectedModel ?: defaultModel()).bundle(ext)
         } catch (e: Exception) {
             context.close()
             throw e
@@ -70,15 +89,64 @@ object TypeScriptExtensions {
         return ctx
     }
 
-    private class Adapter(private val rt: JsRuntime) {
+    private class Adapter(private val rt: JsRuntime, private val workspace: Workspace, private val model: ModelClient?) {
         private val bundleName = rt.bundleName
 
-        fun bundle(ext: Value) = ExtensionBundle(
-            systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },
-            tools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]") },
-            guardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") },
-            listeners = ext.array("listeners").mapIndexed { i, v -> listener(v, "$bundleName listeners[$i]") },
-        )
+        fun bundle(ext: Value): ExtensionBundle {
+            val declared = ext.getMember("runtime")?.takeUnless { it.isNull }
+            val specs = rt.subAgentSpecs(declared)
+            val tools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]", declared) }
+            val guardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") }
+            return ExtensionBundle(
+                systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },
+                tools = tools,
+                guardrails = guardrails,
+                listeners = ext.array("listeners").mapIndexed { i, v -> listener(v, "$bundleName listeners[$i]") },
+                runtime = runtime(declared, specs, tools, guardrails),
+            )
+        }
+
+        /**
+         * Reads `Extension.runtime` into the loop's [AgentRuntime]. Every member is optional and defaults
+         * to v1, so a bundle that never mentions `runtime` behaves exactly as before.
+         *
+         * A sub-agent may only use tools this bundle registers, and is given the SAME guardrails: the
+         * policy then applies to a delegated run exactly as it does to the parent, because the child is
+         * judged by the same rules rather than by a second copy of them.
+         */
+        private fun runtime(
+            declared: Value?,
+            specs: List<SubAgentSpec>,
+            tools: List<Tool>,
+            guardrails: List<Guardrail>,
+        ): AgentRuntime {
+            if (declared == null) return object : AgentRuntime {}
+            return object : AgentRuntime {
+                override val mode = rt.mode(declared)
+
+                override fun subAgentRunner(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? {
+                    // Only a spec the bundle itself declared may run, even if a tool invents one.
+                    val known = specs.firstOrNull { it.name == spec.name } ?: return null
+                    // The child's model is a fresh one: the parent's client is one turn of one session.
+                    val child = model ?: return null
+                    return SubAgentLoops.runner(
+                        spec = known,
+                        model = child,
+                        systemPrompt = rt.subAgentPrompt(known),
+                        tools = tools,
+                        guardrails = guardrails,
+                        workspace = workspace,
+                    )
+                }
+
+                override fun approveEditsFor(tool: Tool, input: ToolInput, workspace: Workspace): Boolean =
+                    rt.approveEdits(declared, tool, input)
+
+                // Delegation is per-child (each child has its own budget guardrail), so the parent loop,
+                // which is not a sub-agent, has nothing to interrupt.
+                override fun interruptCheck(): String? = null
+            }
+        }
 
         private fun section(v: Value, what: String): SystemPromptSection {
             val name = v.string("name", what)
@@ -99,7 +167,7 @@ object TypeScriptExtensions {
             }
         }
 
-        private fun tool(v: Value, what: String): Tool {
+        private fun tool(v: Value, what: String, declared: Value?): Tool {
             val name = v.string("name", what)
             val description = v.string("description", what)
             val schema = rt.toJson(v.getMember("inputSchema") ?: throw TypeScriptExtensionException("$what: missing inputSchema"))
@@ -110,7 +178,7 @@ object TypeScriptExtensions {
                 override val description = description
                 override val inputSchema = JsonSchema(schema)
                 override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
-                    val result = rt.call("tool '$name'.execute") { v.invokeMember("execute", rt.toJs(input.json), toolContext(ctx)) }
+                    val result = rt.call("tool '$name'.execute") { v.invokeMember("execute", rt.toJs(input.json), toolContext(ctx, declared)) }
                     return JsonCodec.decodeOutcome(rt.toJson(result), "tool '$name' result")
                 }
             }
@@ -156,7 +224,7 @@ object TypeScriptExtensions {
         private fun turnContext(ctx: TurnContext): Value =
             rt.toJs(JsonCodec.turnContext(ctx)).also { it.putMember("workspace", rt.workspace(ctx.workspace)) }
 
-        private fun toolContext(ctx: ToolContext): Value = rt.toJs(
+        private fun toolContext(ctx: ToolContext, declared: Value?): Value = rt.toJs(
             JsonObject(
                 mapOf(
                     "runId" to JsonPrimitive(ctx.runId),
@@ -169,6 +237,9 @@ object TypeScriptExtensions {
             it.putMember("log", rt.log(ctx.events::emit, ctx.runId, "ts:${ctx.toolUseId}"))
             it.putMember("exec", rt.exec(ctx.workspace))
             it.putMember("spawn", rt.spawn(ctx.workspace))
+            // v2: present only when the bundle declares sub-agents, so a tool can tell "no runner" apart
+            // from "the runner failed" and say which.
+            if (declared != null && !rt.subAgentSpecs(declared).isEmpty()) it.putMember("delegate", rt.delegate())
         }
 
         private fun Value.array(member: String): List<Value> {

@@ -2,6 +2,12 @@ package com.jdriven.harness.typescript
 
 import com.jdriven.harness.api.AgentEvent
 import com.jdriven.harness.api.ShellCommand
+import com.jdriven.harness.api.SystemPromptSection
+import com.jdriven.harness.api.Tool
+import com.jdriven.harness.api.ToolInput
+import com.jdriven.harness.api.SubAgentOutcome
+import com.jdriven.harness.api.SubAgentRunner
+import com.jdriven.harness.api.SubAgentSpec
 import com.jdriven.harness.api.Workspace
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -97,6 +103,105 @@ internal class JsRuntime(val context: Context, val bundleName: String) {
     fun spawn(ws: Workspace): ProxyExecutable = fn { args ->
         ShellCommand.spawn(ws.root, args.string(0), ws.resolve(args.string(1)))
         null
+    }
+
+    // ---- v2: reading the bundle's `runtime` declaration -------------------------------------------
+
+    /** `runtime.mode`, or `default`. An unknown string is a bundle bug, so it fails at load time. */
+    fun mode(declared: Value): String {
+        val raw = declared.getMember("mode")?.takeIf { it.isString }?.asString() ?: return "default"
+        val known = setOf("default", "plan", "acceptEdits")
+        if (raw !in known) throw TypeScriptExtensionException("$bundleName runtime.mode is '$raw'; expected one of ${known.joinToString()}")
+        return raw
+    }
+
+    /** `runtime.subAgents`: parsed and validated once, so a bad spec fails at load, not mid-turn. */
+    fun subAgentSpecs(declared: Value?): List<SubAgentSpec> {
+        if (declared == null) return emptyList()
+        val arr = declared.getMember("subAgents")?.takeUnless { it.isNull } ?: return emptyList()
+        if (!arr.hasArrayElements()) throw TypeScriptExtensionException("$bundleName runtime.subAgents must be an array")
+        val specs = (0 until arr.arraySize).map { specOf(arr.getArrayElement(it)) }
+        val names = specs.map { it.name }
+        val duplicate = names.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        if (duplicate.isNotEmpty()) throw TypeScriptExtensionException("$bundleName declares duplicate sub-agents: $duplicate")
+        return specs
+    }
+
+    /**
+     * `runtime.approveEdits(tool, input)`. Only the loop calls this, and only for a call the guardrails
+     * already decided to ask about, so it can loosen an ASK and nothing else.
+     */
+    fun approveEdits(declared: Value, tool: Tool, input: ToolInput): Boolean {
+        val fn = declared.getMember("approveEdits")?.takeIf { it.canExecute() } ?: return false
+        // A non-boolean answer is treated as "no": the loop then asks, which is the safe direction.
+        val verdict = call("runtime.approveEdits") { fn.execute(tool.name, toJs(input.json)) }
+        if (!verdict.isBoolean) {
+            throw TypeScriptExtensionException("$bundleName runtime.approveEdits must return a boolean")
+        }
+        return verdict.asBoolean()
+    }
+
+    /**
+     * The system prompt for one delegated run. It is built here rather than in JS so the child's prompt
+     * cannot contain the parent's role text: a sub-agent has its own, and that is the isolation claim.
+     */
+    fun subAgentPrompt(spec: SubAgentSpec): List<SystemPromptSection> {
+        // A child's prompt is its role ONLY. The parent's sections never reach it, because the transcript
+        // and the prompt are the two things a sub-agent must not inherit.
+        return listOf(
+            SystemPromptSection.Static(
+                "sub_agent_role",
+                "You are the ${spec.name} sub-agent: ${spec.description}. " +
+                    "You cannot ask the user anything, and you cannot change anything you were not asked to. " +
+                    "Answer in under 120 words, with the specifics asked for and no preamble.",
+            ),
+        )
+    }
+
+    /**
+     * `ctx.delegate(spec, prompt)` for tools: runs a sub-agent through [runner] and returns
+     * `{ kind: "completed" | "failed", ... }` (see `SubAgentOutcome` in harness.ts).
+     *
+     * The spec crosses as plain JSON, so the JVM re-reads it here rather than trusting a live JS object:
+     * a bundle cannot hand the loop a spec that changes while the sub-agent runs. A malformed spec is a
+     * tool failure, not an exception the model cannot act on.
+     */
+    fun delegate(runner: (SubAgentSpec) -> SubAgentRunner?): ProxyExecutable = fn { args ->
+        val spec = try {
+            specOf(args.firstOrNull() ?: throw IllegalArgumentException("delegate(spec, prompt) needs a spec"))
+        } catch (e: IllegalArgumentException) {
+            return@fn ProxyObject.fromMap(mapOf("kind" to "failed", "reason" to "invalid sub-agent spec: ${e.message}"))
+        }
+        val prompt = args.getOrNull(1)?.takeIf { it.isString }?.asString() ?: ""
+        val agent = runner(spec)
+            ?: return@fn ProxyObject.fromMap(
+                mapOf("kind" to "failed", "reason" to "no runner for sub-agent '${spec.name}': this bundle declared it but the harness cannot run it"),
+            )
+        when (val outcome = agent.run(prompt)) {
+            is SubAgentOutcome.Completed -> ProxyObject.fromMap(
+                mapOf("kind" to "completed", "text" to outcome.text, "calls" to outcome.calls, "iterations" to outcome.iterations),
+            )
+            is SubAgentOutcome.Failed -> ProxyObject.fromMap(mapOf("kind" to "failed", "reason" to outcome.reason))
+        }
+    }
+
+    /** Reads a [SubAgentSpec] out of plain JSON, with the defaults and checks the loop relies on. */
+    private fun specOf(value: Value): SubAgentSpec {
+        if (!value.hasMembers()) throw IllegalArgumentException("spec must be an object")
+        fun text(member: String): String? = value.getMember(member)?.takeIf { it.isString }?.asString()
+        val name = text("name")?.takeIf { it.isNotBlank() } ?: throw IllegalArgumentException("spec.name is required")
+        val description = text("description") ?: ""
+        val toolsMember = value.getMember("tools") ?: throw IllegalArgumentException("spec.tools is required")
+        if (!toolsMember.hasArrayElements()) throw IllegalArgumentException("spec.tools must be an array")
+        val tools = (0 until toolsMember.arraySize).map {
+            val t = toolsMember.getArrayElement(it)
+            if (!t.isString) throw IllegalArgumentException("spec.tools must contain strings")
+            t.asString()
+        }
+        val iterations = value.getMember("maxIterations")?.takeIf { it.fitsInInt() }?.asInt() ?: 6
+        // A budget of 0 would make every sub-agent fail immediately; refuse it here rather than in the loop.
+        if (iterations < 1) throw IllegalArgumentException("spec.maxIterations must be at least 1")
+        return SubAgentSpec(name, description, tools, iterations)
     }
 
     /**

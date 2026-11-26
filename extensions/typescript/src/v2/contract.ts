@@ -1,10 +1,11 @@
 // v2 contract — additive to @harness/api. Nothing here changes a v1 type.
 //
 // v2 is built out of the SAME four extension points as v1 (§3–§6): a skill is a section plus a tool,
-// a policy is a guardrail, compaction is `ProceedWith`, provenance is a section plus an `Ask`. The two
-// things that genuinely need the loop are approval SCOPE (v1 remembers "approve always" per tool name,
-// which over-grants) and delegation (a nested loop). Those are `ApprovalScope` in the core API and
-// `SubAgentRunner` below; everything else in this file is expressible as an extension.
+// a policy is a guardrail, compaction is `ProceedWith`, provenance is a section plus an `Ask`. The
+// three things that genuinely need the loop are approval SCOPE (v1 remembers "approve always" per tool
+// name, which over-grants), delegation (a nested loop inside a tool) and acceptEdits (which loosens a
+// decision, and a guardrail may only tighten one). Those are `ApprovalScope` and `AgentRuntime` in the
+// core API, requested through `AgentRuntimeSpec` below; everything else here is an extension.
 
 import type { Message, Tool, ToolCall, Workspace } from "@harness/api";
 
@@ -28,18 +29,39 @@ export interface SubAgentSpec {
 }
 
 /**
- * What a sub-agent gets to call: tools by name, from its own restricted set. The runner never sees the
- * parent's transcript — it is handed a prompt and returns an answer, which is the whole isolation claim.
+ * What a delegated run returned. The child's transcript never crosses this boundary: only a summary
+ * does, which is the isolation claim the cost lesson is about.
  */
-export interface SubAgentRunner {
-  run(spec: SubAgentSpec, prompt: string, available: Tool[]): Promise<SubAgentResult>;
+export interface SubAgentOutcome {
+  readonly kind: "completed" | "failed";
+  readonly text?: string;
+  readonly reason?: string;
+  /** Inference calls the sub-agent made, in its own context. */
+  readonly calls?: number;
+  readonly iterations?: number;
 }
 
-export interface SubAgentResult {
-  readonly text: string;
-  /** For the cost comparison the workshop teaches: calls the sub-agent made, in its own context. */
-  readonly calls: number;
-  readonly iterations: number;
+/** What the JVM hands a tool that delegates (ctx.delegate). */
+export type SubAgentDelegate = (spec: SubAgentSpec, prompt: string) => SubAgentOutcome;
+
+/**
+ * v2 — what a bundle asks of the loop. Declared once at assembly and returned from the extension's
+ * `runtime` member; the JVM applies it. All of it defaults to v1, and none of it is a guardrail: a
+ * guardrail may only tighten a decision, and every member here either loosens one (acceptEdits) or
+ * needs a nested loop (delegation).
+ */
+export interface AgentRuntimeSpec {
+  readonly mode?: PermissionMode;
+  /** The agents this bundle declares. Each must also be reachable from a tool. */
+  readonly subAgents?: readonly SubAgentSpec[];
+  /**
+   * `acceptEdits` coverage: the loop consults this INSTEAD of asking the human, but only for calls the
+   * guardrails already decided to ask about, and only when `mode` is `acceptEdits`. Returning true for
+   * an unknown tool would be a bug; the policy guardrail has already run and a DENY wins regardless.
+   */
+  readonly approveEdits?: (tool: string, input: Record<string, unknown>) => boolean;
+  /** Values the loop checks between iterations: a budget cannot be enforced inside one tool call. */
+  readonly budget?: Readonly<Record<string, number>>;
 }
 
 /** v2 — policy as data. Absent matcher matches anything; deny > ask > allow; layers merge in order. */
