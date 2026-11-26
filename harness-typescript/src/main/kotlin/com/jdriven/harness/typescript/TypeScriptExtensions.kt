@@ -105,7 +105,7 @@ object TypeScriptExtensions {
         fun bundle(ext: Value): ExtensionBundle {
             val declared = ext.getMember("runtime")?.takeUnless { it.isNull }
             declaredAgents = rt.subAgentSpecs(declared)
-            bundleTools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]", declared) }
+            bundleTools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]") }
             // A sub-agent's tool list must be satisfiable by this bundle. Caught here rather than at
             // run time, and rather than by silently giving the child fewer tools than it was told it has.
             val registered = bundleTools.map { it.name }.toSet()
@@ -189,7 +189,7 @@ object TypeScriptExtensions {
             }
         }
 
-        private fun tool(v: Value, what: String, declared: Value?): Tool {
+        private fun tool(v: Value, what: String): Tool {
             val name = v.string("name", what)
             val description = v.string("description", what)
             val schema = rt.toJson(v.getMember("inputSchema") ?: throw TypeScriptExtensionException("$what: missing inputSchema"))
@@ -200,7 +200,7 @@ object TypeScriptExtensions {
                 override val description = description
                 override val inputSchema = JsonSchema(schema)
                 override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
-                    val result = rt.call("tool '$name'.execute") { v.invokeMember("execute", rt.toJs(input.json), toolContext(ctx, declared)) }
+                    val result = rt.call("tool '$name'.execute") { v.invokeMember("execute", rt.toJs(input.json), toolContext(ctx)) }
                     return JsonCodec.decodeOutcome(rt.toJson(result), "tool '$name' result")
                 }
             }
@@ -246,7 +246,7 @@ object TypeScriptExtensions {
         private fun turnContext(ctx: TurnContext): Value =
             rt.toJs(JsonCodec.turnContext(ctx)).also { it.putMember("workspace", rt.workspace(ctx.workspace)) }
 
-        private fun toolContext(ctx: ToolContext, declared: Value?): Value = rt.toJs(
+        private fun toolContext(ctx: ToolContext): Value = rt.toJs(
             JsonObject(
                 mapOf(
                     "runId" to JsonPrimitive(ctx.runId),
@@ -259,8 +259,8 @@ object TypeScriptExtensions {
             it.putMember("log", rt.log(ctx.events::emit, ctx.runId, "ts:${ctx.toolUseId}"))
             it.putMember("exec", rt.exec(ctx.workspace))
             it.putMember("spawn", rt.spawn(ctx.workspace))
-            // v2: present only when the bundle declares sub-agents, so a tool can tell "no runner" apart
-            // from "the runner failed" and say which.
+            // v2: advertised only when a runner can actually be built, so the tool never sees a capability
+            // the session cannot honour. A tool must still handle its absence (see delegateTool).
             if (canDelegate()) it.putMember("delegate", rt.delegate { spec -> runnerFor(spec, ctx.workspace) })
         }
 
