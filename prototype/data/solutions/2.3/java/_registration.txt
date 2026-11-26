@@ -1,0 +1,9 @@
+Then delete the default role from systemprompt/defaults/DefaultSections.java, or the model gets two roles:
+return List.of(
+        Role.section(workspace),   // delete this line
+        WorkingAgreements.section(),
+        IterationBudget.section());
+
+And register Mission first, in JavaExtensions.java, before the defaults:
+.section(Mission.section())
+.sections(DefaultSections.all(workspace))

@@ -1,0 +1,3 @@
+In JavaExtensions.java:
+.tool(new StartToolbox())
+.tool(new ToolboxStatus())

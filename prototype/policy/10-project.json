@@ -1,0 +1,7 @@
+{
+  "policy": "project-local",
+  "layer": "10-project",
+  "version": 1,
+  "owner": "you",
+  "rules": []
+}

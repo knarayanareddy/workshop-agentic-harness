@@ -1,0 +1,578 @@
+[
+ {
+  "part": "1.1",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/Environment.kt",
+  "stored": "solutions/1.1/kotlin/Environment.kt",
+  "sha": "c5a2753a4420",
+  "source": "workshop.html#environment (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "1.1",
+  "lang": "java",
+  "file": "systemprompt/exercise/Environment.java",
+  "stored": "solutions/1.1/java/Environment.java",
+  "sha": "850724f1df58",
+  "source": "workshop.html#environment (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "1.1",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/environment.ts",
+  "stored": "solutions/1.1/typescript/environment.ts",
+  "sha": "86d4658c8786",
+  "source": "workshop.html#environment (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "1.2",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/OpenRaCheckout.kt",
+  "stored": "solutions/1.2/kotlin/OpenRaCheckout.kt",
+  "sha": "bc1d051e0527",
+  "source": "workshop.html#openra-checkout (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "1.2",
+  "lang": "java",
+  "file": "systemprompt/exercise/OpenRaCheckout.java",
+  "stored": "solutions/1.2/java/OpenRaCheckout.java",
+  "sha": "db0c68661c02",
+  "source": "workshop.html#openra-checkout (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "1.2",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/openRaCheckout.ts",
+  "stored": "solutions/1.2/typescript/openRaCheckout.ts",
+  "sha": "0ca71ba46452",
+  "source": "workshop.html#openra-checkout (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "1.3",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/ProjectInstructions.kt",
+  "stored": "solutions/1.3/kotlin/ProjectInstructions.kt",
+  "sha": "66227e5a8fb7",
+  "source": "workshop.html#project-instructions (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "1.3",
+  "lang": "java",
+  "file": "systemprompt/exercise/ProjectInstructions.java",
+  "stored": "solutions/1.3/java/ProjectInstructions.java",
+  "sha": "ea99341cb182",
+  "source": "workshop.html#project-instructions (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "1.3",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/projectInstructions.ts",
+  "stored": "solutions/1.3/typescript/projectInstructions.ts",
+  "sha": "666f99939ce0",
+  "source": "workshop.html#project-instructions (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "1.4",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/OpenRaState.kt",
+  "stored": "solutions/1.4/kotlin/OpenRaState.kt",
+  "sha": "47e2c977a9e4",
+  "source": "workshop.html#openra-state (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "1.4",
+  "lang": "java",
+  "file": "systemprompt/exercise/OpenRaState.java",
+  "stored": "solutions/1.4/java/OpenRaState.java",
+  "sha": "cb10874e8f12",
+  "source": "workshop.html#openra-state (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "1.4",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/openRaState.ts",
+  "stored": "solutions/1.4/typescript/openRaState.ts",
+  "sha": "9a0d5ca7d47e",
+  "source": "workshop.html#openra-state (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "2.1",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/OpenRaRules.kt",
+  "stored": "solutions/2.1/kotlin/OpenRaRules.kt",
+  "sha": "751065a83964",
+  "source": "workshop.html#openra-rules (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "2.1",
+  "lang": "java",
+  "file": "systemprompt/exercise/OpenRaRules.java",
+  "stored": "solutions/2.1/java/OpenRaRules.java",
+  "sha": "1a118d981ade",
+  "source": "workshop.html#openra-rules (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "2.1",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/openRaRules.ts",
+  "stored": "solutions/2.1/typescript/openRaRules.ts",
+  "sha": "06c4be27728a",
+  "source": "workshop.html#openra-rules (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "2.2",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/AnswerStyle.kt",
+  "stored": "solutions/2.2/kotlin/AnswerStyle.kt",
+  "sha": "3eecac908194",
+  "source": "workshop.html#answer-style (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "2.2",
+  "lang": "java",
+  "file": "systemprompt/exercise/AnswerStyle.java",
+  "stored": "solutions/2.2/java/AnswerStyle.java",
+  "sha": "c6256faafc8a",
+  "source": "workshop.html#answer-style (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "2.2",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/answerStyle.ts",
+  "stored": "solutions/2.2/typescript/answerStyle.ts",
+  "sha": "8ca3ed8b339b",
+  "source": "workshop.html#answer-style (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "2.3",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/Mission.kt",
+  "stored": "solutions/2.3/kotlin/Mission.kt",
+  "sha": "8178a4e82247",
+  "source": "workshop.html#mission (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "2.3",
+  "lang": "java",
+  "file": "systemprompt/exercise/Mission.java",
+  "stored": "solutions/2.3/java/Mission.java",
+  "sha": "9a81944d230d",
+  "source": "workshop.html#mission (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "2.3",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/mission.ts",
+  "stored": "solutions/2.3/typescript/mission.ts",
+  "sha": "9eea43117d20",
+  "source": "workshop.html#mission (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "2.4",
+  "lang": "kotlin",
+  "file": "systemprompt/exercise/GroundRules.kt",
+  "stored": "solutions/2.4/kotlin/GroundRules.kt",
+  "sha": "d0ac9b17852c",
+  "source": "workshop.html#ground-rules (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "2.4",
+  "lang": "java",
+  "file": "systemprompt/exercise/GroundRules.java",
+  "stored": "solutions/2.4/java/GroundRules.java",
+  "sha": "3b20db46e026",
+  "source": "workshop.html#ground-rules (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "2.4",
+  "lang": "typescript",
+  "file": "src/systemprompt/exercise/groundRules.ts",
+  "stored": "solutions/2.4/typescript/groundRules.ts",
+  "sha": "2a559bdc05d0",
+  "source": "workshop.html#ground-rules (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.1",
+  "lang": "kotlin",
+  "file": "tools/exercise/StartToolbox.kt",
+  "stored": "solutions/3.1/kotlin/StartToolbox.kt",
+  "sha": "48413647f560",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.1",
+  "lang": "kotlin",
+  "file": "tools/exercise/ToolboxStatus.kt",
+  "stored": "solutions/3.1/kotlin/ToolboxStatus.kt",
+  "sha": "64858bf6b51a",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.1",
+  "lang": "java",
+  "file": "tools/exercise/StartToolbox.java",
+  "stored": "solutions/3.1/java/StartToolbox.java",
+  "sha": "c7a541fa3311",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.1",
+  "lang": "java",
+  "file": "tools/exercise/ToolboxStatus.java",
+  "stored": "solutions/3.1/java/ToolboxStatus.java",
+  "sha": "0a314fcb5cce",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.1",
+  "lang": "typescript",
+  "file": "src/tools/exercise/startToolbox.ts",
+  "stored": "solutions/3.1/typescript/startToolbox.ts",
+  "sha": "fda82e933a08",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.1",
+  "lang": "typescript",
+  "file": "src/tools/exercise/toolboxStatus.ts",
+  "stored": "solutions/3.1/typescript/toolboxStatus.ts",
+  "sha": "66c7e035a753",
+  "source": "workshop.html#toolbox (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.2",
+  "lang": "kotlin",
+  "file": "tools/exercise/Play.kt",
+  "stored": "solutions/3.2/kotlin/Play.kt",
+  "sha": "7d16a9dcf1fa",
+  "source": "workshop.html#play (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.2",
+  "lang": "java",
+  "file": "tools/exercise/Play.java",
+  "stored": "solutions/3.2/java/Play.java",
+  "sha": "4e174d264450",
+  "source": "workshop.html#play (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.2",
+  "lang": "typescript",
+  "file": "src/tools/exercise/play.ts",
+  "stored": "solutions/3.2/typescript/play.ts",
+  "sha": "9d7d2b606511",
+  "source": "workshop.html#play (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.3",
+  "lang": "kotlin",
+  "file": "tools/exercise/ActorRules.kt",
+  "stored": "solutions/3.3/kotlin/ActorRules.kt",
+  "sha": "be742f87121a",
+  "source": "workshop.html#actor-rules (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.3",
+  "lang": "java",
+  "file": "tools/exercise/ActorRules.java",
+  "stored": "solutions/3.3/java/ActorRules.java",
+  "sha": "e26380b0b681",
+  "source": "workshop.html#actor-rules (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.3",
+  "lang": "typescript",
+  "file": "src/tools/exercise/actorRules.ts",
+  "stored": "solutions/3.3/typescript/actorRules.ts",
+  "sha": "c719d0c66834",
+  "source": "workshop.html#actor-rules (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.4",
+  "lang": "kotlin",
+  "file": "tools/exercise/FindActor.kt",
+  "stored": "solutions/3.4/kotlin/FindActor.kt",
+  "sha": "031b612a25c5",
+  "source": "workshop.html#find-actor (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.4",
+  "lang": "java",
+  "file": "tools/exercise/FindActor.java",
+  "stored": "solutions/3.4/java/FindActor.java",
+  "sha": "2560107dda51",
+  "source": "workshop.html#find-actor (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.4",
+  "lang": "typescript",
+  "file": "src/tools/exercise/findActor.ts",
+  "stored": "solutions/3.4/typescript/findActor.ts",
+  "sha": "e17e4eef9541",
+  "source": "workshop.html#find-actor (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.5",
+  "lang": "kotlin",
+  "file": "tools/exercise/SetActorValue.kt",
+  "stored": "solutions/3.5/kotlin/SetActorValue.kt",
+  "sha": "d942151fcb03",
+  "source": "workshop.html#set-actor-value (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.5",
+  "lang": "java",
+  "file": "tools/exercise/SetActorValue.java",
+  "stored": "solutions/3.5/java/SetActorValue.java",
+  "sha": "4cd824e4de94",
+  "source": "workshop.html#set-actor-value (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.5",
+  "lang": "typescript",
+  "file": "src/tools/exercise/setActorValue.ts",
+  "stored": "solutions/3.5/typescript/setActorValue.ts",
+  "sha": "8dcf71ec476b",
+  "source": "workshop.html#set-actor-value (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "3.6",
+  "lang": "kotlin",
+  "file": "tools/exercise/CheckMod.kt",
+  "stored": "solutions/3.6/kotlin/CheckMod.kt",
+  "sha": "1c0519c65b81",
+  "source": "workshop.html#check-mod (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "3.6",
+  "lang": "java",
+  "file": "tools/exercise/CheckMod.java",
+  "stored": "solutions/3.6/java/CheckMod.java",
+  "sha": "450aa9aa532f",
+  "source": "workshop.html#check-mod (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "3.6",
+  "lang": "typescript",
+  "file": "src/tools/exercise/checkMod.ts",
+  "stored": "solutions/3.6/typescript/checkMod.ts",
+  "sha": "a77a32b629de",
+  "source": "workshop.html#check-mod (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.1",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/NoPushGuardrail.kt",
+  "stored": "solutions/4.1/kotlin/NoPushGuardrail.kt",
+  "sha": "7251b1394141",
+  "source": "workshop.html#no-push (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.1",
+  "lang": "java",
+  "file": "guardrails/exercise/NoPushGuardrail.java",
+  "stored": "solutions/4.1/java/NoPushGuardrail.java",
+  "sha": "744a70ceb92b",
+  "source": "workshop.html#no-push (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.1",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/noPush.ts",
+  "stored": "solutions/4.1/typescript/noPush.ts",
+  "sha": "c7bbe8b0a41a",
+  "source": "workshop.html#no-push (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.2",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/NoPythonGuardrail.kt",
+  "stored": "solutions/4.2/kotlin/NoPythonGuardrail.kt",
+  "sha": "caeb76e432c1",
+  "source": "workshop.html#no-python (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.2",
+  "lang": "java",
+  "file": "guardrails/exercise/NoPythonGuardrail.java",
+  "stored": "solutions/4.2/java/NoPythonGuardrail.java",
+  "sha": "414b26174d44",
+  "source": "workshop.html#no-python (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.2",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/noPython.ts",
+  "stored": "solutions/4.2/typescript/noPython.ts",
+  "sha": "1f5f3bdbbee2",
+  "source": "workshop.html#no-python (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.3",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/PromptInjectionGuardrail.kt",
+  "stored": "solutions/4.3/kotlin/PromptInjectionGuardrail.kt",
+  "sha": "0a493a55f990",
+  "source": "workshop.html#prompt-injection (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.3",
+  "lang": "java",
+  "file": "guardrails/exercise/PromptInjectionGuardrail.java",
+  "stored": "solutions/4.3/java/PromptInjectionGuardrail.java",
+  "sha": "ced45005eb29",
+  "source": "workshop.html#prompt-injection (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.3",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/promptInjection.ts",
+  "stored": "solutions/4.3/typescript/promptInjection.ts",
+  "sha": "7532666b7f88",
+  "source": "workshop.html#prompt-injection (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.4",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/SecretScanGuardrail.kt",
+  "stored": "solutions/4.4/kotlin/SecretScanGuardrail.kt",
+  "sha": "c5fe73f1d898",
+  "source": "workshop.html#secret-scan (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.4",
+  "lang": "java",
+  "file": "guardrails/exercise/SecretScanGuardrail.java",
+  "stored": "solutions/4.4/java/SecretScanGuardrail.java",
+  "sha": "a6e611bce3e7",
+  "source": "workshop.html#secret-scan (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.4",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/secretScan.ts",
+  "stored": "solutions/4.4/typescript/secretScan.ts",
+  "sha": "c089b63c2280",
+  "source": "workshop.html#secret-scan (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.5",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/PipeToShellGuardrail.kt",
+  "stored": "solutions/4.5/kotlin/PipeToShellGuardrail.kt",
+  "sha": "544def6a0935",
+  "source": "workshop.html#pipe-to-shell (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.5",
+  "lang": "java",
+  "file": "guardrails/exercise/PipeToShellGuardrail.java",
+  "stored": "solutions/4.5/java/PipeToShellGuardrail.java",
+  "sha": "6373877161e0",
+  "source": "workshop.html#pipe-to-shell (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.5",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/pipeToShell.ts",
+  "stored": "solutions/4.5/typescript/pipeToShell.ts",
+  "sha": "41ccb26d3eb8",
+  "source": "workshop.html#pipe-to-shell (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "4.6",
+  "lang": "kotlin",
+  "file": "guardrails/exercise/WorkspaceOnlyGuardrail.kt",
+  "stored": "solutions/4.6/kotlin/WorkspaceOnlyGuardrail.kt",
+  "sha": "4149247bc0e5",
+  "source": "workshop.html#workspace-only (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "4.6",
+  "lang": "java",
+  "file": "guardrails/exercise/WorkspaceOnlyGuardrail.java",
+  "stored": "solutions/4.6/java/WorkspaceOnlyGuardrail.java",
+  "sha": "cab8298ff515",
+  "source": "workshop.html#workspace-only (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "4.6",
+  "lang": "typescript",
+  "file": "src/guardrails/exercise/workspaceOnly.ts",
+  "stored": "solutions/4.6/typescript/workspaceOnly.ts",
+  "sha": "1e4679a2d652",
+  "source": "workshop.html#workspace-only (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "5.1",
+  "lang": "kotlin",
+  "file": "listeners/exercise/CostMeter.kt",
+  "stored": "solutions/5.1/kotlin/CostMeter.kt",
+  "sha": "e9fede7f6408",
+  "source": "workshop.html#cost-meter (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "5.1",
+  "lang": "java",
+  "file": "listeners/exercise/CostMeter.java",
+  "stored": "solutions/5.1/java/CostMeter.java",
+  "sha": "9ed069e435e3",
+  "source": "workshop.html#cost-meter (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "5.1",
+  "lang": "typescript",
+  "file": "src/listeners/exercise/costMeter.ts",
+  "stored": "solutions/5.1/typescript/costMeter.ts",
+  "sha": "3ec7b3a0f691",
+  "source": "workshop.html#cost-meter (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "5.2",
+  "lang": "kotlin",
+  "file": "listeners/exercise/Bell.kt",
+  "stored": "solutions/5.2/kotlin/Bell.kt",
+  "sha": "1828725dc1a3",
+  "source": "workshop.html#bell (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "5.2",
+  "lang": "java",
+  "file": "listeners/exercise/Bell.java",
+  "stored": "solutions/5.2/java/Bell.java",
+  "sha": "b2a3ae608a3e",
+  "source": "workshop.html#bell (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "5.2",
+  "lang": "typescript",
+  "file": "src/listeners/exercise/bell.ts",
+  "stored": "solutions/5.2/typescript/bell.ts",
+  "sha": "1562fdd1c0eb",
+  "source": "workshop.html#bell (details.solution > div[data-lang=typescript])"
+ },
+ {
+  "part": "5.3",
+  "lang": "kotlin",
+  "file": "listeners/exercise/TurnSummary.kt",
+  "stored": "solutions/5.3/kotlin/TurnSummary.kt",
+  "sha": "82bf7c3167bb",
+  "source": "workshop.html#turn-summary (details.solution > div[data-lang=kotlin])"
+ },
+ {
+  "part": "5.3",
+  "lang": "java",
+  "file": "listeners/exercise/TurnSummary.java",
+  "stored": "solutions/5.3/java/TurnSummary.java",
+  "sha": "236075ed2c59",
+  "source": "workshop.html#turn-summary (details.solution > div[data-lang=java])"
+ },
+ {
+  "part": "5.3",
+  "lang": "typescript",
+  "file": "src/listeners/exercise/turnSummary.ts",
+  "stored": "solutions/5.3/typescript/turnSummary.ts",
+  "sha": "4401a34d1b26",
+  "source": "workshop.html#turn-summary (details.solution > div[data-lang=typescript])"
+ }
+]

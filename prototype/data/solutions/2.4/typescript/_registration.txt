@@ -1,0 +1,6 @@
+Then delete the default working agreements from systemprompt/defaults/index.ts, or the model gets two sets of rules that disagree:
+export const defaultSections = (workspace: Workspace): SystemPromptSection[] => [
+  role(workspace),
+  workingAgreements,   // delete this line
+  iterationBudget,
+];

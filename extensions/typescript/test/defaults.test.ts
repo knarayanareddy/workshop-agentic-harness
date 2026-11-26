@@ -114,6 +114,19 @@ describe("guardrails", () => {
     expect(await write("src/A.kt")).toBe("allow");
   });
 
+  it("build files cannot be edited either (edit_file does not bypass the deny)", async () => {
+    const edit = async (p: string) => kind(await buildFile.beforeToolUse!(toolCall("edit_file", { path: p }), turnContext(workspace)));
+    expect(await edit("pom.xml")).toBe("deny");
+    expect(await edit("build.gradle.kts")).toBe("deny");
+    expect(await edit("src/../package.json")).toBe("deny");
+    // edit_file keeps v1's ungated behaviour outside src/: only the deny was broadened
+    expect(await edit("notes.md")).toBe("allow");
+    expect(await edit("src/A.kt")).toBe("allow");
+    // a tool this guardrail does not understand is left alone
+    const read = kind(await buildFile.beforeToolUse!(toolCall("read_file", { path: "pom.xml" }), turnContext(workspace)));
+    expect(read).toBe("allow");
+  });
+
   it("oversized results are capped", async () => {
     const cap = resultCap(10);
     const after = (outcome: Parameters<NonNullable<typeof cap.afterToolUse>>[1]) =>

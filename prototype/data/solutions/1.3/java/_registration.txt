@@ -1,0 +1,2 @@
+In JavaExtensions.java:
+.sections(ProjectInstructions.sections(workspace))

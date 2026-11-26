@@ -1,0 +1,9 @@
+#!/bin/sh
+# Print the final, fully-merged rules for an actor (after all Inherits).
+# Lets an agent confirm a change had the intended effect.
+# Usage: openra-rules <ACTOR> [mod]   e.g. openra-rules 2TNK
+set -eu
+ACTOR="${1:?usage: openra-rules <ACTOR> [mod]}"
+MOD="${2:-ra}"
+cd "${OPENRA_DIR}"
+./utility.sh "${MOD}" --resolved-rules "${ACTOR}"

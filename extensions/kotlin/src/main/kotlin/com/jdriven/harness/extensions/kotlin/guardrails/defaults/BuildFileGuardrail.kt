@@ -12,8 +12,8 @@ class BuildFileGuardrail : Guardrail {
     private val buildFiles = setOf("build.gradle.kts", "settings.gradle.kts", "gradle.properties", "pom.xml", "package.json")
 
     override fun beforeToolUse(call: ToolCall, ctx: TurnContext): ToolDecision {
-        // Opt in per tool: this guardrail only understands write_file's input.
-        if (call.tool.name != "write_file") return ToolDecision.Allow
+        // Covers write_file and edit_file (REVIEW F-7: edit_file used to bypass the deny).
+        if (call.tool.name != "write_file" && call.tool.name != "edit_file") return ToolDecision.Allow
 
         val relative = ctx.workspace.relativize(ctx.workspace.resolve(call.input.string("path")))
 
@@ -21,7 +21,8 @@ class BuildFileGuardrail : Guardrail {
             relative.substringAfterLast('/') in buildFiles ->
                 ToolDecision.Deny("$relative is build configuration — make the test pass, not the build")
 
-            !relative.startsWith("src/") ->
+            // edit_file keeps its v1 behaviour: only the build-file deny is broadened.
+            call.tool.name == "write_file" && !relative.startsWith("src/") ->
                 ToolDecision.Ask("write outside src/: $relative")
 
             else -> ToolDecision.Allow

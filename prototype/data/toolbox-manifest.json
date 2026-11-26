@@ -1,0 +1,7 @@
+{
+ "workspace/docker/Dockerfile": "403943c6ac60106d4641e9cd7bcf16f8aeffdb7cb6a5ab3875c89923ee646b5c",
+ "workspace/docker/bin/openra-build": "73224c4ef789345cad7411d97686500570e96cdbd366bcf93cf7d5b8da9bf8cd",
+ "workspace/docker/bin/openra-check": "ac62f3a3cf09773f9cc562b50dd7e78e9103f19a8e6ed3c876105b53744e9098",
+ "workspace/docker/bin/openra-rules": "6fbc3ffaa3e84ce8c8716781dc8cdbeb6c635ed745d397b431f4ef64d3b45cb2",
+ "workspace/docker/bin/openra-package": "bdd61f9f8d33c304c4cfe9c15ae401308e1c65496a149119c0b657a764974929"
+}

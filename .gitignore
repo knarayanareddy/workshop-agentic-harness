@@ -24,3 +24,13 @@ reports/
 
 # Local secrets
 .env
+
+# The 48 reference solutions, placed into their exercise packages by
+# prototype/scripts/place-solutions.mjs for a compile check (CI + `npm run solutions:verify`).
+# They are copies of prototype/data/solutions/ and must never be committed: attendees write these.
+extensions/kotlin/src/**/exercise/*.kt
+extensions/java/src/**/exercise/*.java
+extensions/typescript/src/**/exercise/*.ts
+
+# Downloaded source archives (the delivered zip is a snapshot, not source)
+google_drive/

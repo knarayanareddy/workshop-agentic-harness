@@ -1,0 +1,140 @@
+name: CI
+
+# Verifies the two things that were never verified before:
+#   1. the 48 Kotlin/Java reference solutions actually compile (item 5 of the review)
+#   2. the workshop's premises about OpenRA still hold at the pinned commit
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel a superseded run on the same ref; CI here is cheap and idempotent.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The OpenRA commit the workshop pins (prototype/v2/extensions.ts, workshop.html §1.2).
+  # 2026-10-20: the last commit before upstream added AGENTS.md (9636b63ea, 2026-10-28).
+  OPENRA_PIN: 1f594e32065615ed1847962c80ecfe6e868a11c3
+
+jobs:
+  prototype:
+    name: Prototype (TypeScript, offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (strict)
+        run: npm run typecheck
+      # These three need no API key, no JDK and no network: that is the prototype's contract.
+      - name: Verification checks (designed failures, determinism, tolerance, SSR)
+        run: npm run verify
+      - name: Regression (41 scenarios x v1/v2)
+        run: npm run regress
+      - name: DOM smoke (real App in jsdom)
+        run: npm run smoke
+      - name: Single-file build
+        run: npm run build
+      - name: Assert dist/ is one self-contained file
+        run: |
+          set -eu
+          test -f dist/index.html
+          # no external script/link references, so it runs from file:// offline
+          if grep -Eq '(src|href)="https?://' dist/index.html; then
+            echo "dist/index.html references an external URL; it must be self-contained"; exit 1
+          fi
+          echo "dist/index.html: $(wc -c < dist/index.html) bytes, self-contained"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: prototype-dist
+          path: dist/index.html
+
+  # The repo's own extension tests (the worksheet's guardrails/tools/sections), untouched.
+  extensions-typescript:
+    name: extensions/typescript tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensions/typescript
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: extensions/typescript/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  # ITEM 5. Compiles all 48 Kotlin/Java solutions by placing them in their exercise packages.
+  # Placement is derived from each file's own `package` line (prototype/scripts/place-solutions.mjs),
+  # so this is the same code a facilitator runs locally -- not a bespoke CI hack.
+  jvm-solutions:
+    name: Kotlin/Java solutions compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Place the 48 solutions into their exercise packages
+        run: node prototype/scripts/place-solutions.mjs install .
+      - name: Assert they are all in place
+        run: node prototype/scripts/place-solutions.mjs verify .
+      # No `--offline`: unlike the prototype, this needs the Kotlin/Java toolchains from Maven Central.
+      - name: Compile Kotlin and Java (with the repo's own tests)
+        run: ./gradlew build --no-daemon
+      - name: Clean up the placed solutions
+        if: always()
+        run: node prototype/scripts/place-solutions.mjs clean .
+
+  # ITEM 8. The workshop's premises about upstream are claims; this makes them fail loudly if broken.
+  upstream-pin:
+    name: OpenRA pin still valid
+    runs-on: ubuntu-latest
+    steps:
+      # Needed by the "pin agrees with source" step: the first step only uses curl.
+      - uses: actions/checkout@v5
+      - name: Pinned commit exists and has no AGENTS.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          api="https://api.github.com/repos/OpenRA/OpenRA"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "$api/commits/$OPENRA_PIN")
+          echo "commit $OPENRA_PIN -> HTTP $code"
+          test "$code" = "200"
+          # The whole point of pinning here: upstream forbids agentic use from 2026-10-28 onward.
+          agents=$(curl -sS -o /dev/null -w '%{http_code}' "$api/contents/AGENTS.md?ref=$OPENRA_PIN")
+          echo "AGENTS.md at pin -> HTTP $agents (expect 404)"
+          test "$agents" = "404"
+      - name: Pin in prototype and worksheet agree
+        run: |
+          echo "::notice::OPENRA_PIN=[$OPENRA_PIN] pwd=$(pwd)"
+          echo "::notice::file exists: $(test -f prototype/v2/extensions.ts && echo yes || echo NO)"
+          echo "::notice::pin line: $(grep -m1 'export const PIN' prototype/v2/extensions.ts 2>&1 || echo GONE)"
+          echo "::notice::len=$(wc -c < prototype/v2/extensions.ts 2>&1) sha=$(sha256sum prototype/v2/extensions.ts 2>/dev/null | cut -c1-12)"
+          if ! grep -q "$OPENRA_PIN" prototype/v2/extensions.ts; then
+            echo "::error::pin mismatch: env has $OPENRA_PIN but the file does not contain it"
+            exit 1
+          fi
+          echo "prototype/v2/extensions.ts pins $OPENRA_PIN"
+      - name: Pinned tree still targets net10.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          curl -sS "https://api.github.com/repos/OpenRA/OpenRA/contents/Directory.Build.props?ref=$OPENRA_PIN" \
+            | python3 -c 'import json,sys,base64; t=base64.b64decode(json.load(sys.stdin)["content"]).decode(); sys.exit(0 if "<TargetFramework>net10.0</TargetFramework>" in t else "not net10.0: "+t[:200])'
+          echo "net10.0 confirmed"

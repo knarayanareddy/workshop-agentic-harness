@@ -1,0 +1,13 @@
+ok   App mounts and runs the default scenario (4.1) in v1 — Agentic harness · inspectable prototypev1 · faithful to the 
+ok   Workflow tab shows the normative nodes
+ok   stepping the graph works
+ok   Assemble tab lists sections → tools → guardrails → listeners
+ok   v2 layer is visible with policy rules and provenance checksums
+ok   Cost tab: attribution + prices
+ok   Diff tab explains the divergence
+ok   Audit tab: chain verifies — audit log (append-only, hash-chained)chain verifieshead 088273d6356095 (cyrb53, NOT crypt
+ok   clicking a guardrail verdict opens the inspector with hooks and source — pill=true
+ok   scenario switch to 6.1 runs
+ok   permalink written to the URL hash — #s=eyJzIjoiNi4xIiwidiI6MiwidCI
+ok   regression view runs scenarios — 41/41 · 41 pass in both
+all DOM smoke checks passed

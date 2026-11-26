@@ -1,0 +1,9 @@
+Then delete the default role from systemprompt/defaults/DefaultSections.kt, or the model gets two roles:
+fun all(workspace: Workspace): List<SystemPromptSection> = listOf(
+    Role.section(workspace),   // delete this line
+    WorkingAgreements.section(),
+    IterationBudget.section(),
+)
+
+And register Mission first, in KotlinExtensions.kt:
+systemPrompt = listOf(Mission.section()) + DefaultSections.all(workspace) + ...,
