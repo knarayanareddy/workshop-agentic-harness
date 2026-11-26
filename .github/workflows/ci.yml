@@ -117,16 +117,7 @@ jobs:
           exit "$status"
       - name: Report what the JVM suites ran
         if: always()
-        run: |
-          # The test XML is the only durable evidence of how many tests actually executed.
-          total=0; failed=0
-          for f in $(find . -path "*build/test-results*" -name "*.xml"); do
-            t=$(grep -o 'tests="[0-9]*"' "$f" | head -1 | grep -o '[0-9]*')
-            fl=$(grep -o 'failures="[0-9]*"' "$f" | head -1 | grep -o '[0-9]*')
-            total=$((total + ${t:-0})); failed=$((failed + ${fl:-0}))
-          done
-          echo "::notice::JVM tests executed: $total, failures: $failed"
-          echo "JVM tests executed: $total (failures: $failed)"
+        run: python3 .github/scripts/junit-report.py
       - name: Clean up the placed solutions
         if: always()
         run: node prototype/scripts/place-solutions.mjs clean .
