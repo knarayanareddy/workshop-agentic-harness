@@ -169,7 +169,7 @@ npm run gen-docs       # rebuild this file
 
 | What | Where |
 |---|---|
-| Scenario definitions (27 parts, 6 extras, 9 v2 labs) | `prototype/scenarios/index.ts` (one `add({...})` each: prompts, world, plan, approver, assertions, hook, cleanup, v2 note) |
+| Scenario definitions (27 parts, 6 extras, **8** v2 labs — 41 in total) | `prototype/scenarios/index.ts` (one `add({...})` each: prompts, world, plan, approver, assertions, hook, cleanup, v2 note) |
 | The loop | `prototype/engine/agent.ts` |
 | Bundle composition (v1 + v2) | `prototype/engine/bundles.ts` (`ARTEFACTS` = which file is which part) |
 | Mock model + DSL (`script`, `say`, `call`, seeded `pick`) | `prototype/engine/mock.ts` |
