@@ -1,6 +1,7 @@
 package com.jdriven.harness.typescript
 
 import com.jdriven.harness.api.*
+import com.jdriven.harness.core.OpenAiModelClient
 import com.jdriven.harness.core.SubAgentLoops
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -25,8 +26,11 @@ object TypeScriptExtensions {
      * reported as unavailable rather than attempted. A sub-agent needs its own conversation: one session
      * is one transcript, and the child's is not the parent's.
      */
-    private fun defaultModel(): ModelClient? =
-        if (System.getenv("MODEL_API_KEY").isNullOrBlank()) null else com.jdriven.harness.core.OpenAiModelClient().model
+    private fun defaultModel(): ModelClient? {
+        if (System.getenv("MODEL_API_KEY").isNullOrBlank()) return null
+        // One client per delegated run is not needed: a conversation is per Agent, not per client.
+        return OpenAiModelClient().model
+    }
 
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
     const val SHELL_GLOBAL = "__harnessShell"
