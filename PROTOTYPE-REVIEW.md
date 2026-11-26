@@ -511,3 +511,63 @@ job passed. The API answered 200 from here and unauthenticated requests are rate
 shared runner IPs hit 403/429 intermittently. A health check that fails for reasons unrelated to what it
 checks is worse than none, so it now authenticates with `GITHUB_TOKEN`, retries three times, and says
 "this is usually rate limiting, not a missing commit" if it still fails. Green again on `45871310701`.
+
+---
+
+# Part 6 — delegation, acceptEdits, and the three things that were "not implemented"
+
+Part 5 listed three limits. All three are now implemented and tested.
+
+| Was | Now |
+|---|---|
+| Delegation not implemented; `SubAgentRunner` a stub | A real nested `Agent`, tested across the language boundary |
+| `acceptEdits` a stub | Implemented, and deliberately *not* as a guardrail |
+| The runner's allow-list "a design, not a sandbox" | **Still true.** That one is a fact about what an allow-list can be, not a missing feature |
+
+## Delegation needed the loop, and the reason is structural
+
+An extension cannot nest the loop it is already running inside. So the seam is `AgentRuntime` in the core
+API: a bundle *declares* what it needs (`subAgents`, `approveEdits`, `mode`) and the loop *applies* it. It
+is passed to `Agent` as a value, never handed to a guardrail or a tool, so a bundle cannot reach into a
+session it does not own.
+
+The isolation claims are enforced and each has a test: the child's tools come from its spec alone (an
+unlisted tool is unknown, not denied), it gets a fresh `Agent` so no transcript crosses in either
+direction, its approval handler only denies, its runtime is empty so it cannot delegate again, and its
+events never reach the parent's trace.
+
+## acceptEdits is the interesting one
+
+A guardrail may only tighten a decision. "Skip the prompt" loosens one, so it cannot be a guardrail
+without making the extension point meaningless. The loop consults `approveEditsFor` **after** every
+guardrail has decided, and only for an ASK — by then a DENY has already returned. That ordering is the
+whole safety argument, and it is tested directly (`acceptEdits never overrides a deny`).
+
+## The bug this work found
+
+**`load_skill` was denied by the default-deny from the day v2 shipped.** The bundle advertised progressive
+disclosure in its system prompt and refused every call to it, because the policy JSON had no rule for v2's
+own tools. The existing guardrail tests passed: they exercised the paths they were written for. What caught
+it was evaluating the *real* policy JSON against the *real* tool list and reading the verdict.
+
+That is the same lesson as the CI failures in Part 5, from the other direction: a test that only checks
+what you thought of is not evidence about what you shipped.
+
+## Numbers
+
+- `extensions/typescript`: 107 tests (was 87); v2 bundle 50.6 kb (was 43.9).
+- JVM: **90 tests, 0 failures** (was 84).
+- Core changes: `Agent.kt` (3 hooks + the runtime parameter), new `SubAgentLoops.kt`, `Runtime.kt` in the
+  API, and the bridge in `harness-typescript` (which now depends on `harness-core`; no cycle, since `app`
+  already depends on both).
+
+## What CI caught this time
+
+Seven rounds. The ones worth recording because they were real, not typos: `load_skill` being denied;
+a spec naming an unregistered tool silently shrinking a sub-agent's toolset (now a load error); and a test
+that cleared its injected model falling through to a *real* API client and trying the network from a unit
+test. The rest were mine: wrong import, `if/else` swallowing a branch, `OpenAiModelClient.model` (a String)
+confused for the client, reversed scripted sequences, and a `'x'` where Kotlin needs `"x"`.
+
+The JUnit annotation added in Part 5 paid for itself: every one of those arrived as the failing test's
+name and assertion message, not as "exit code 1".
