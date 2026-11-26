@@ -2,6 +2,7 @@ package com.jdriven.harness.core
 
 import com.jdriven.harness.api.AgentEvent
 import com.jdriven.harness.api.AgentEventListener
+import com.jdriven.harness.api.AgentRuntime
 import com.jdriven.harness.api.ApprovalDecision
 import com.jdriven.harness.api.ApprovalHandler
 import com.jdriven.harness.api.ApprovalRequest
@@ -56,6 +57,12 @@ class Agent(
     private val listeners: List<AgentEventListener>,
     private val workspace: Workspace,
     private val config: AgentConfig = AgentConfig(),
+    /**
+     * v2 — what this session's bundle asks of the loop: delegation, `acceptEdits`, an interrupt budget.
+     * Defaults to v1 (none of it). Passed in rather than handed to an extension, so an extension cannot
+     * reach a session it does not own.
+     */
+    val runtime: AgentRuntime = object : AgentRuntime {},
 ) {
     private val events = EventSink { event -> listeners.forEach { it.onEvent(event) } }
 
@@ -71,6 +78,17 @@ class Agent(
     // still ApprovalScope.WholeTool, i.e. v1's behaviour, so nothing changes for existing bundles.
     private val approvedAlways = mutableSetOf<String>()
     private val history = mutableListOf<Message>()
+
+    /**
+     * v2 — a budget the extension wants enforced between iterations. Nothing can stop an inference call
+     * already in flight, so this is checked at the top of the loop instead of inside a tool.
+     */
+    private fun interruptReason(): String? = try {
+        runtime.interruptCheck()
+    } catch (e: Exception) {
+        events.emit(AgentEvent.Warning(null, "the interrupt check failed (${e.describe()}); continuing"))
+        null
+    }
 
     /** The session transcript so far. */
     val messages: List<Message> get() = history.toList()
@@ -92,6 +110,13 @@ class Agent(
 
         var continuations = 0
         for (iteration in 1..config.maxIterations) {
+            // A tool can ask the loop to stop (v2: a token or wall-clock budget). Checked between
+            // iterations because nothing can interrupt an inference call already in flight.
+            interruptReason()?.let { why ->
+                events.emit(AgentEvent.Warning(runId, "interrupted: $why"))
+                return end(runId, "interrupted") { AgentResult.Aborted(why) }
+            }
+
             var ctx = TurnContext(runId, iteration, config.maxIterations, history.toList(), workspace)
 
             // [ExtensionPoint] Guardrail.beforeInference — each sees the previous one's rewrite.
@@ -211,8 +236,20 @@ class Agent(
             }
         }
         if (asks.isNotEmpty()) {
-            denialByHuman(call, asks, askers, runId)?.let { reason ->
-                return ContentBlock.ToolResult(use.id, "Denied by the user: $reason", isError = true)
+            // v2 acceptEdits: an explicit, per-tool policy decision to skip the prompt. It is checked
+            // here, after every guardrail has decided, so a DENY above has already returned.
+            val auto = try {
+                runtime.mode == "acceptEdits" && runtime.approveEditsFor(tool, call.input, workspace)
+            } catch (e: Exception) {
+                events.emit(AgentEvent.Warning(runId, "acceptEdits check failed (${e.describe()}); asking as usual"))
+                false
+            }
+            if (auto) {
+                events.emit(AgentEvent.ApprovalRequested(runId, call.tool.name, asks, "approved automatically (acceptEdits)"))
+            } else {
+                denialByHuman(call, asks, askers, runId)?.let { reason ->
+                    return ContentBlock.ToolResult(use.id, "Denied by the user: $reason", isError = true)
+                }
             }
         }
 
