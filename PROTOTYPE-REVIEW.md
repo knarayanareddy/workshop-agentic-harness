@@ -439,3 +439,67 @@ Worth recording, because it is the argument for having built it:
   organisers' call. `1f594e3` is simply the newest date at which every workshop premise was still true.
 - Item 6 (capture real toolbox output) and item 7 (`Agent.resume`, `execve` runner) remain open; both need
   Docker or a design change, not just a build step.
+
+---
+
+# Part 5 — v2 in the real harness (not just the prototype)
+
+The prototype proved v2 was *designable*. This part puts it in the harness participants actually run.
+
+## Result
+
+| | |
+|---|---|
+| **Where** | `extensions/typescript/src/v2/` + `extensions/typescript/policy/*.json` + one core change |
+| **Opt-in** | `HARNESS_V2=1 HARNESS_LANGUAGE=typescript ./gradlew :app:run`. v1 is untouched and still the default |
+| **Tests** | **87** in `extensions/typescript` (was 19) and **72 JVM tests, 0 failures** (was 66) |
+| **CI** | run `45870596071`: 4/4 jobs green, including the JVM suite and the built v2 artefact |
+
+## The interesting finding: most of v2 needed no loop change
+
+The four v1 extension points were nearly sufficient:
+
+| Feature | Mechanism | Core change |
+|---|---|---|
+| Policy as data | JSON + a `beforeToolUse` guardrail | none |
+| argv runner (closes C1) | a `Tool` taking `argv[]`, no shell | none |
+| Skills / progressive disclosure | static catalog section + `load_skill` | none |
+| Compaction | `beforeInference` → `ProceedWith` | none |
+| Audit log | a listener + hash chain | none |
+| Provenance + upstream ack | static section + an `Ask` guardrail | none |
+| **Scoped approvals (C2)** | `ApprovalScope` + `Guardrail.approvalScope` | **`Agent.kt`** |
+
+Only C2 needed the loop, because v1 recorded `approvedAlways += call.tool.name` — a guardrail cannot
+un-remember what the loop remembered. The change is backward-compatible by construction: a guardrail
+that expresses no scope still gets `WholeTool`, i.e. v1's exact behaviour.
+
+## Deliberately not done
+
+**Delegation is not in the real harness.** A sub-agent needs a nested loop inside a tool, which changes
+what a tool is allowed to do. `SubAgentRunner` is declared as the seam; nothing implements it. The
+prototype still demonstrates the idea. This is stated in `v2/DESIGN.md` rather than glossed over.
+
+## Four bugs CI caught that I could not
+
+No JDK here, so the JVM path was only checkable in CI. It earned its keep four times:
+
+1. **`shipped-bundle.test.ts` needed `dist/`** but ran during `npm test`, before any build — a clean
+   checkout had no bundle. It now builds the bundle itself when absent, and CI also builds and re-runs
+   it, so the artefact is checked both ways.
+2. **The Gradle npm task passed two script names to the first script.** `args = [run, build, bundle:v2]`
+   makes npm hand `bundle:v2` to `build`, where esbuild reads it as a second input file. I had been
+   running a *different* script locally, so the bug existed only in the path Gradle uses. Fixed with a
+   single `build:all` script.
+3. **`covers()` crashed on a whole-tool key.** `key.split(':', limit = 3)` returns two parts for
+   `"tool:echo"`, and destructuring a 2-element list into 3 components throws — killing exactly the
+   v1-compatibility path. Now indexed with `getOrElse`.
+4. **My own test asserted the opposite of the design**: it used `ArgvPrefix(["git"])`, a prefix that
+   correctly covers `git push` as well as `git status`. The test was wrong, not the code.
+
+Bugs 3 and 4 are only visible by *running* the Kotlin, which is why the second `covers()` bug mattered:
+it was in the branch that keeps v1 working.
+
+## Trust the number, not the colour
+
+A green JVM job could mean the suite ran zero tests. CI now reads the JUnit XML and reports
+`JVM tests executed: 72, failures: 0`, so "green" comes with a count.
