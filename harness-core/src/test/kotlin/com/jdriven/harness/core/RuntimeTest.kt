@@ -98,7 +98,7 @@ class RuntimeTest {
         val childModel = ScriptedModelClient(
             listOf(ScriptedModelClient.toolUse("read_file" to path("big.txt")), text("it is 3 lines")),
         )
-        var childTranscript: List<com.jdriven.harness.api.Message> = emptyList()
+        val childTranscripts = mutableListOf<List<com.jdriven.harness.api.Message>>()
 
         val delegation = object : Tool {
             override val name = "delegate"
@@ -107,7 +107,7 @@ class RuntimeTest {
             override fun execute(input: ToolInput, ctx: ToolContext): ToolOutcome {
                 val runner = SubAgentLoops.runner(
                     spec = explorer,
-                    model = ModelClient { req -> childTranscript = req.messages; childModel.infer(req) },
+                    model = ModelClient { req -> childTranscripts += req.messages; childModel.infer(req) },
                     systemPrompt = listOf(SystemPromptSection.Static("role", "You are the explorer sub-agent.")),
                     tools = listOf(reader(), writer()),
                     guardrails = emptyList(),
@@ -127,9 +127,14 @@ class RuntimeTest {
         // the summary crossed into the parent's transcript
         val toolResult = agent.messages.flatMap { it.content }.filterIsInstance<ContentBlock.ToolResult>().single()
         assertEquals("it is 3 lines", toolResult.content)
-        // the child saw its OWN prompt only, never the parent's conversation
-        assertTrue(childTranscript.single().text.contains("how big is it"), "the child gets the task, not the transcript")
-        assertFalse(childTranscript.any { it.text.contains("investigate the file") }, "the parent's prompt must not leak into the child")
+        // the child saw its OWN prompt only, never the parent's conversation. Its first request is the
+        // task alone; later requests add the child's own tool results.
+        assertTrue(childTranscripts.first().single().text.contains("how big is it"), "the child gets the task, not the transcript")
+        assertEquals(2, childTranscripts.size, "the child ran its own loop: read, then answer")
+        assertFalse(
+            childTranscripts.flatten().any { it.text.contains("investigate the file") },
+            "the parent's prompt must not leak into the child",
+        )
         // and the child's file read is in the child's transcript only
         assertFalse(agent.messages.any { it.text.contains("contents of big.txt") }, "what the child read stays out of the parent")
     }
