@@ -31,10 +31,6 @@ object TypeScriptExtensions {
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
     const val SHELL_GLOBAL = "__harnessShell"
 
-    /**
-     * [workspace] is the assembly context (`AssemblyContext` in harness.ts), handed to the
-     * extension's default export, a function that builds the extension.
-     */
     /** Set by [useModel]: for tests, so a delegated run never needs an API key or the network. */
     @Volatile
     private var injectedModel: ModelClient? = null
@@ -44,6 +40,10 @@ object TypeScriptExtensions {
         injectedModel = client
     }
 
+    /**
+     * [workspace] is the assembly context (`AssemblyContext` in harness.ts), handed to the
+     * extension's default export, a function that builds the extension.
+     */
     fun load(bundleFile: Path, workspace: Workspace): ExtensionBundle {
         val source = Source.newBuilder("js", bundleFile.toFile()).build()
         return load(source, bundleFile.name, workspace)
@@ -92,19 +92,46 @@ object TypeScriptExtensions {
     private class Adapter(private val rt: JsRuntime, private val workspace: Workspace, private val model: ModelClient?) {
         private val bundleName = rt.bundleName
 
+        // Filled in by bundle(): the pieces a delegated run needs, so the runner factory and the
+        // `delegate` capability share one path instead of two that could drift apart.
+        private var declaredAgents: List<SubAgentSpec> = emptyList()
+        private var bundleTools: List<Tool> = emptyList()
+        private var bundleGuardrails: List<Guardrail> = emptyList()
+
         fun bundle(ext: Value): ExtensionBundle {
             val declared = ext.getMember("runtime")?.takeUnless { it.isNull }
-            val specs = rt.subAgentSpecs(declared)
-            val tools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]", declared) }
-            val guardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") }
+            declaredAgents = rt.subAgentSpecs(declared)
+            bundleTools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]", declared) }
+            bundleGuardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") }
             return ExtensionBundle(
                 systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },
-                tools = tools,
-                guardrails = guardrails,
+                tools = bundleTools,
+                guardrails = bundleGuardrails,
                 listeners = ext.array("listeners").mapIndexed { i, v -> listener(v, "$bundleName listeners[$i]") },
-                runtime = runtime(declared, specs, tools, guardrails),
+                runtime = runtime(declared),
             )
         }
+
+        /**
+         * The runner for one declared agent, or null when it cannot be built: an unknown spec, or no model
+         * (no API key, and no injected script in a test). The `delegate` capability is only advertised when
+         * this can succeed, so the model is never offered something the session cannot honour.
+         */
+        private fun runnerFor(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? {
+            // Only a spec the bundle itself declared may run, even if a tool invents one.
+            if (declaredAgents.none { it.name == spec.name }) return null
+            return SubAgentLoops.runner(
+                spec = spec,
+                model = model ?: return null,
+                systemPrompt = rt.subAgentPrompt(spec),
+                tools = bundleTools,
+                guardrails = bundleGuardrails,
+                workspace = workspace,
+            )
+        }
+
+        /** Whether a delegated run can actually start: the tool checks nothing, this decides. */
+        private fun canDelegate(): Boolean = model != null && declaredAgents.isNotEmpty()
 
         /**
          * Reads `Extension.runtime` into the loop's [AgentRuntime]. Every member is optional and defaults
@@ -114,36 +141,18 @@ object TypeScriptExtensions {
          * policy then applies to a delegated run exactly as it does to the parent, because the child is
          * judged by the same rules rather than by a second copy of them.
          */
-        private fun runtime(
-            declared: Value?,
-            specs: List<SubAgentSpec>,
-            tools: List<Tool>,
-            guardrails: List<Guardrail>,
-        ): AgentRuntime {
+        private fun runtime(declared: Value?): AgentRuntime {
             if (declared == null) return object : AgentRuntime {}
             return object : AgentRuntime {
                 override val mode = rt.mode(declared)
 
-                override fun subAgentRunner(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? {
-                    // Only a spec the bundle itself declared may run, even if a tool invents one.
-                    val known = specs.firstOrNull { it.name == spec.name } ?: return null
-                    // The child's model is a fresh one: the parent's client is one turn of one session.
-                    val child = model ?: return null
-                    return SubAgentLoops.runner(
-                        spec = known,
-                        model = child,
-                        systemPrompt = rt.subAgentPrompt(known),
-                        tools = tools,
-                        guardrails = guardrails,
-                        workspace = workspace,
-                    )
-                }
+                override fun subAgentRunner(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? =
+                    runnerFor(spec, workspace)
 
                 override fun approveEditsFor(tool: Tool, input: ToolInput, workspace: Workspace): Boolean =
                     rt.approveEdits(declared, tool, input)
 
-                // Delegation is per-child (each child has its own budget guardrail), so the parent loop,
-                // which is not a sub-agent, has nothing to interrupt.
+                // A parent session has no budget of its own: budgets belong to sub-agent runs.
                 override fun interruptCheck(): String? = null
             }
         }
@@ -239,7 +248,7 @@ object TypeScriptExtensions {
             it.putMember("spawn", rt.spawn(ctx.workspace))
             // v2: present only when the bundle declares sub-agents, so a tool can tell "no runner" apart
             // from "the runner failed" and say which.
-            if (declared != null && !rt.subAgentSpecs(declared).isEmpty()) it.putMember("delegate", rt.delegate())
+            if (canDelegate()) it.putMember("delegate", rt.delegate { spec -> runnerFor(spec, ctx.workspace) })
         }
 
         private fun Value.array(member: String): List<Value> {
