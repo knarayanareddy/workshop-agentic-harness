@@ -100,7 +100,19 @@ jobs:
         run: node prototype/scripts/place-solutions.mjs verify .
       # No `--offline`: unlike the prototype, this needs the Kotlin/Java toolchains from Maven Central.
       - name: Compile Kotlin and Java (with the repo's own tests)
-        run: ./gradlew build --no-daemon
+        # Gradle's failure text is the useful part, and workflow logs are not always reachable, so put
+        # compiler errors into annotations, which `gh run view` and the PR page both show.
+        run: |
+          set +e
+          ./gradlew build --no-daemon 2>&1 | tee /tmp/gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" != "0" ]; then
+            echo "::error::gradle build failed (exit $status)"
+            # compiler errors, test failures and the first lines of the report
+            grep -nE "^e: |error: |^FAILURE|Execution failed|> Task .* FAILED|Caused by|^[a-zA-Z0-9_/.\-]+\.(kt|java):[0-9]+" /tmp/gradle.log \
+              | head -40 | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+          exit "$status"
       - name: Clean up the placed solutions
         if: always()
         run: node prototype/scripts/place-solutions.mjs clean .
