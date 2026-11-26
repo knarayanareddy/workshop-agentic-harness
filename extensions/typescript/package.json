@@ -9,7 +9,8 @@
     "build": "npm run typecheck && npm run bundle",
     "test": "tsc --noEmit -p tsconfig.test.json && vitest run",
     "bundle:v2": "esbuild src/v2/index.ts --bundle --format=iife --global-name=__harnessExtension --target=es2022 --outfile=dist/extension-v2.js",
-    "build:v2": "npm run typecheck && npm run bundle:v2"
+    "build:v2": "npm run typecheck && npm run bundle:v2",
+    "build:all": "npm run build && npm run bundle:v2"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

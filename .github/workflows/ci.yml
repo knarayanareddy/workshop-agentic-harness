@@ -109,7 +109,8 @@ jobs:
           if [ "$status" != "0" ]; then
             echo "::error::gradle build failed (exit $status)"
             # compiler errors, test failures and the first lines of the report
-            grep -nE "^e: |error: |^FAILURE|Execution failed|> Task .* FAILED|Caused by|^[a-zA-Z0-9_/.\-]+\.(kt|java):[0-9]+" /tmp/gradle.log \
+            # npm errors are reported as "npm error ...", tsc errors as "error TSxxxx", Kotlin as "e: "
+            grep -nE "^e: |error TS|npm error|^npm ERR|Error: |Execution failed|> Task .* FAILED|Caused by" /tmp/gradle.log \
               | head -40 | while IFS= read -r line; do echo "::error::$line"; done
           fi
           exit "$status"

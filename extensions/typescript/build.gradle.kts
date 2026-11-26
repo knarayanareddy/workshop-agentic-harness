@@ -34,7 +34,7 @@ val bundle = tasks.register<NpmTask>("bundle") {
     group = "build"
     description = "Type-checks, then bundles src/ into dist/extension.js and src/v2/ into dist/extension-v2.js"
     dependsOn(tasks.npmInstall)
-    args = listOf("run", "typecheck", "bundle:v2", "bundle")
+    args = listOf("run", "build:all")
     inputs.dir("src")
     inputs.dir("policy")
     inputs.dir(rootProject.file("harness-api/typescript"))
