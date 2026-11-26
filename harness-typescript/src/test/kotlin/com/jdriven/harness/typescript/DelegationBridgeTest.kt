@@ -207,7 +207,7 @@ class DelegationBridgeTest {
         // There is no supported way to say "no model at all" from a test, because a null injection means
         // "use the default". So assert the path the model actually takes when no runner can be built: the
         // bundle is loaded with no declared agents, which is what a session without delegation looks like.
-        val noAgents = script.replace('subAgents: SUB_AGENTS,', 'subAgents: [],')
+        val noAgents = script.replace("subAgents: SUB_AGENTS,", "subAgents: [],")
         val bundle = load(noAgents)
         assertTrue(
             bundle.runtime.subAgentRunner(SubAgentSpec("explorer", "", listOf("peek"), 3), LocalWorkspace(dir)) == null,
