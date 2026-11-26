@@ -503,3 +503,11 @@ it was in the branch that keeps v1 working.
 
 A green JVM job could mean the suite ran zero tests. CI now reads the JUnit XML and reports
 `JVM tests executed: 72, failures: 0`, so "green" comes with a count.
+
+## Post-merge: the pin check was rate limited, not broken
+
+The first CI run on `main` after the v2 merge failed `OpenRA pin still valid` — minutes after the same
+job passed. The API answered 200 from here and unauthenticated requests are rate-limited per IP, so
+shared runner IPs hit 403/429 intermittently. A health check that fails for reasons unrelated to what it
+checks is worse than none, so it now authenticates with `GITHUB_TOKEN`, retries three times, and says
+"this is usually rate limiting, not a missing commit" if it still fails. Green again on `45871310701`.
