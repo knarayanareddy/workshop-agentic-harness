@@ -1,6 +1,8 @@
 package com.jdriven.harness.typescript
 
 import com.jdriven.harness.api.*
+import com.jdriven.harness.core.OpenAiModelClient
+import com.jdriven.harness.core.SubAgentLoops
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,8 +21,31 @@ import kotlin.io.path.name
 object TypeScriptExtensions {
     const val GLOBAL_NAME = "__harnessExtension"
 
+    /**
+     * v2 — the model a delegated run uses. Null when no API key is configured, and then delegation is
+     * reported as unavailable rather than attempted. A sub-agent needs its own conversation: one session
+     * is one transcript, and the child's is not the parent's.
+     */
+    private fun defaultModel(): ModelClient? {
+        if (System.getenv("MODEL_API_KEY").isNullOrBlank()) return null
+        // A key being present is not enough: the client must be constructible, and a test that never
+        // cleared an injected model must not reach the network by accident.
+        return runCatching { OpenAiModelClient() }
+            .onFailure { System.err.println("[warn] delegation is unavailable: the model client could not be created (${it.message})") }
+            .getOrNull()
+    }
+
     /** Where the bundle finds `shell` (see [JsRuntime.shell]); harness.ts reads it. */
     const val SHELL_GLOBAL = "__harnessShell"
+
+    /** Set by [useModel]: for tests, so a delegated run never needs an API key or the network. */
+    @Volatile
+    private var injectedModel: ModelClient? = null
+
+    /** Makes delegated runs use [client] instead of the API-backed one. Null restores the default. */
+    internal fun useModel(client: ModelClient?) {
+        injectedModel = client
+    }
 
     /**
      * [workspace] is the assembly context (`AssemblyContext` in harness.ts), handed to the
@@ -52,7 +77,8 @@ object TypeScriptExtensions {
             val export = global.takeIf { it.hasMember("default") }?.getMember("default") ?: global
             if (!export.canExecute()) throw TypeScriptExtensionException("$name: the default export must be a function (ctx) => extension")
             val ext = runtime.call("$name default export") { export.execute(assemblyContext(runtime, workspace)) }
-            return Adapter(runtime).bundle(ext)
+            // Resolved once per load: a sub-agent gets a new conversation, not a new HTTP client.
+            return Adapter(runtime, workspace, injectedModel ?: defaultModel()).bundle(ext)
         } catch (e: Exception) {
             context.close()
             throw e
@@ -70,15 +96,82 @@ object TypeScriptExtensions {
         return ctx
     }
 
-    private class Adapter(private val rt: JsRuntime) {
+    private class Adapter(private val rt: JsRuntime, private val workspace: Workspace, private val model: ModelClient?) {
         private val bundleName = rt.bundleName
 
-        fun bundle(ext: Value) = ExtensionBundle(
-            systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },
-            tools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]") },
-            guardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") },
-            listeners = ext.array("listeners").mapIndexed { i, v -> listener(v, "$bundleName listeners[$i]") },
-        )
+        // Filled in by bundle(): the pieces a delegated run needs, so the runner factory and the
+        // `delegate` capability share one path instead of two that could drift apart.
+        private var declaredAgents: List<SubAgentSpec> = emptyList()
+        private var bundleTools: List<Tool> = emptyList()
+        private var bundleGuardrails: List<Guardrail> = emptyList()
+
+        fun bundle(ext: Value): ExtensionBundle {
+            val declared = ext.getMember("runtime")?.takeUnless { it.isNull }
+            declaredAgents = rt.subAgentSpecs(declared)
+            bundleTools = ext.array("tools").mapIndexed { i, v -> tool(v, "$bundleName tools[$i]") }
+            // A sub-agent's tool list must be satisfiable by this bundle. Caught here rather than at
+            // run time, and rather than by silently giving the child fewer tools than it was told it has.
+            val registered = bundleTools.map { it.name }.toSet()
+            declaredAgents.forEach { spec ->
+                val missing = spec.tools.filterNot { it in registered }
+                if (missing.isNotEmpty()) {
+                    throw TypeScriptExtensionException("$bundleName sub-agent '${spec.name}' names tools this bundle does not register: $missing")
+                }
+            }
+            bundleGuardrails = ext.array("guardrails").mapIndexed { i, v -> guardrail(v, "$bundleName guardrails[$i]") }
+            return ExtensionBundle(
+                systemPrompt = ext.array("systemPrompt").mapIndexed { i, v -> section(v, "$bundleName systemPrompt[$i]") },
+                tools = bundleTools,
+                guardrails = bundleGuardrails,
+                listeners = ext.array("listeners").mapIndexed { i, v -> listener(v, "$bundleName listeners[$i]") },
+                runtime = runtime(declared),
+            )
+        }
+
+        /**
+         * The runner for one declared agent, or null when it cannot be built: an unknown spec, or no model
+         * (no API key, and no injected script in a test). The `delegate` capability is only advertised when
+         * this can succeed, so the model is never offered something the session cannot honour.
+         */
+        private fun runnerFor(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? {
+            // Only a spec the bundle itself declared may run, even if a tool invents one.
+            if (declaredAgents.none { it.name == spec.name }) return null
+            return SubAgentLoops.runner(
+                spec = spec,
+                model = model ?: return null,
+                systemPrompt = rt.subAgentPrompt(spec),
+                tools = bundleTools,
+                guardrails = bundleGuardrails,
+                workspace = workspace,
+            )
+        }
+
+        /** Whether a delegated run can actually start: the tool checks nothing, this decides. */
+        private fun canDelegate(): Boolean = model != null && declaredAgents.isNotEmpty()
+
+        /**
+         * Reads `Extension.runtime` into the loop's [AgentRuntime]. Every member is optional and defaults
+         * to v1, so a bundle that never mentions `runtime` behaves exactly as before.
+         *
+         * A sub-agent may only use tools this bundle registers, and is given the SAME guardrails: the
+         * policy then applies to a delegated run exactly as it does to the parent, because the child is
+         * judged by the same rules rather than by a second copy of them.
+         */
+        private fun runtime(declared: Value?): AgentRuntime {
+            if (declared == null) return object : AgentRuntime {}
+            return object : AgentRuntime {
+                override val mode = rt.mode(declared)
+
+                override fun subAgentRunner(spec: SubAgentSpec, workspace: Workspace): SubAgentRunner? =
+                    runnerFor(spec, workspace)
+
+                override fun approveEditsFor(tool: Tool, input: ToolInput, workspace: Workspace): Boolean =
+                    rt.approveEdits(declared, tool, input)
+
+                // A parent session has no budget of its own: budgets belong to sub-agent runs.
+                override fun interruptCheck(): String? = null
+            }
+        }
 
         private fun section(v: Value, what: String): SystemPromptSection {
             val name = v.string("name", what)
@@ -169,6 +262,9 @@ object TypeScriptExtensions {
             it.putMember("log", rt.log(ctx.events::emit, ctx.runId, "ts:${ctx.toolUseId}"))
             it.putMember("exec", rt.exec(ctx.workspace))
             it.putMember("spawn", rt.spawn(ctx.workspace))
+            // v2: advertised only when a runner can actually be built, so the tool never sees a capability
+            // the session cannot honour. A tool must still handle its absence (see delegateTool).
+            if (canDelegate()) it.putMember("delegate", rt.delegate { spec -> runnerFor(spec, ctx.workspace) })
         }
 
         private fun Value.array(member: String): List<Value> {

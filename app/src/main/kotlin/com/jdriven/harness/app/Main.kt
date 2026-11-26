@@ -17,6 +17,11 @@ private val EXIT_COMMANDS = setOf("exit", "quit", "/exit", "/quit")
 private const val LANGUAGE_ENV = "HARNESS_LANGUAGE"
 /** v2 is opt-in. The workshop teaches v1; `HARNESS_V2=1` swaps in the v2 TypeScript bundle. */
 private const val V2_ENV = "HARNESS_V2"
+/**
+ * v2 — the permission mode. `acceptEdits` skips the approval prompt for file edits the policy merely
+ * asks about; denials still apply. Only meaningful with HARNESS_V2=1.
+ */
+private const val MODE_ENV = "HARNESS_MODE"
 
 /**
  * §7 Assembly. This file is the whole agent: it picks the bundle that lists every section of the system prompt,
@@ -49,6 +54,7 @@ fun main(args: Array<String>) {
             approvalHandler = ConsoleApprovalHandler(input),
             listeners = extensionsBundle.listeners + recorder,
             workspace = workspace,
+            runtime = extensionsBundle.runtime,
         )
     }
     var agent = newSession()
@@ -121,7 +127,15 @@ private fun loadTypeScript(workspace: Workspace): ExtensionBundle {
         println(Ansi.red("[error] $bundle not found - the TypeScript build has not run or has failed; $howToBuild"))
         exitProcess(1)
     }
-    if (v2) println(Ansi.dim("v2 extensions: policy as data, argv runner, skills, compaction, audit"))
+    if (v2) {
+        val mode = System.getenv(MODE_ENV)?.trim()?.lowercase()?.ifEmpty { null }
+        if (mode != null && mode !in setOf("default", "plan", "acceptEdits")) {
+            println(Ansi.red("[error] $MODE_ENV=$mode is not supported; use default, plan or acceptEdits"))
+            exitProcess(1)
+        }
+        val extras = listOfNotNull(mode?.let { "mode: $it" }, "delegation: explorer")
+        println(Ansi.dim("v2 extensions: policy as data, argv runner, skills, compaction, audit, ${extras.joinToString()}"))
+    }
     return try {
         TypeScriptExtensions.load(bundle, workspace)
     } catch (e: TypeScriptExtensionException) {

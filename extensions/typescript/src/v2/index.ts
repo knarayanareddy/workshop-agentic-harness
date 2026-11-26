@@ -13,14 +13,15 @@
 // The one thing that is NOT here is scoped approve-always: v1 remembers approvals by tool name in
 // Agent.kt, which over-grants, and only the loop can fix that. See v2/DESIGN.md.
 
-import { ask, defineExtension, type AgentEventListener, type Guardrail, type SystemPromptSection, type Tool } from "@harness/api";
+import { ask, defineExtension, type AgentEventListener, type Guardrail, type StaticSection, type SystemPromptSection, type Tool } from "@harness/api";
 import { defaultGuardrails } from "../guardrails/defaults";
 import { consoleTrace } from "../listeners/defaults/consoleTrace";
 import { defaultSections } from "../systemprompt/defaults";
 import { defaultTools } from "../tools/defaults";
-import { AuditLog, auditEntryFor, compaction, loadSkillTool, skillsCatalogSection } from "./extensions";
+import { AuditLog, auditEntryFor, compaction, estimateTokens, loadSkillTool, skillsCatalogSection } from "./extensions";
 import { parsePolicy, policyGuardrail, runCommandArgv, type PolicyState } from "./policy";
-import type { PermissionMode } from "./contract";
+import { SUB_AGENTS, delegateTool } from "./delegation";
+import type { AgentRuntimeSpec, PermissionMode } from "./contract";
 import base from "../../policy/00-workshop.json";
 import project from "../../policy/10-project.json";
 
@@ -33,6 +34,8 @@ export interface V2Options {
   /** Compaction threshold in tokens. 0 disables compaction. */
   readonly compactAboveTokens?: number;
   readonly keepLast?: number;
+  /** Set to false to assemble without delegation, for a session that cannot run a sub-agent. */
+  readonly delegate?: boolean;
 }
 
 export interface V2Assembly {
@@ -42,6 +45,8 @@ export interface V2Assembly {
   readonly listeners: AgentEventListener[];
   readonly audit: AuditLog;
   readonly policy: PolicyState;
+  /** v2 — what this bundle asks of the loop. The JVM applies it; nothing here does. */
+  readonly runtime: AgentRuntimeSpec;
 }
 
 const UPSTREAM_PIN = "1f594e32065615ed1847962c80ecfe6e868a11c3";
@@ -59,6 +64,27 @@ export const provenanceSection: SystemPromptSection = {
     "- This workspace is a local-only sandbox. Nothing you do here is a contribution upstream.",
   ].join("\n"),
 };
+
+/** What the model is told about its own permissions, so it does not discover the rules by failing. */
+export function permissionsSection(mode: PermissionMode): StaticSection {
+  const lines = [
+    "# Permissions and delegation",
+    "- `run_command` takes `argv` and never a shell string: no pipes, globs, variables or quoting. Only allow-listed programs run.",
+    "- A policy file decides allow / ask / deny for every call, structurally (argv and paths, never a regex over a command string).",
+    "  When a rule says ask, the user is prompted and the reason names the rule and its owner.",
+  ];
+  if (mode === "plan") lines.push("- You are in PLAN mode: writes are denied. Investigate and propose, do not change files.");
+  if (mode === "acceptEdits")
+    lines.push(
+      "- You are in ACCEPT-EDITS mode: edits under the mod directories are applied without a prompt. " +
+        "Denials still apply, and anything the policy guards more tightly is still asked about.",
+    );
+  lines.push(
+    "- `list_agents` shows who you may delegate to; `delegate` hands one of them a self-contained task. " +
+      "A sub-agent has its own context and budget, cannot ask the user, and returns only a short answer.",
+  );
+  return { kind: "static", name: "permissions", text: lines.join("\n") };
+}
 
 /** Asks once, when the model first touches the checkout, that it understands the above. */
 export function upstreamAck(): Guardrail {
@@ -90,6 +116,22 @@ export function assembleV2(workspace: Parameters<typeof defaultSections>[0], opt
   const tools: Tool[] = defaultTools.map((t) => (t.name === "run_command" ? runCommandArgv : t));
   tools.push(loadSkillTool());
 
+  // v2 — delegation. `list_agents` is discoverability, `delegate` is the call. `delegate` is only added
+  // when the loop can run a sub-agent: without a runner it would only ever fail, and a tool that cannot
+  // work should not be advertised to the model.
+  const agents = options.delegate === false ? [] : SUB_AGENTS;
+  if (agents.length > 0) {
+    tools.push(listAgentsTool(agents), delegateTool(agents));
+  }
+
+  const runtime: AgentRuntimeSpec = {
+    mode: policy.mode,
+    subAgents: agents,
+    // acceptEdits is per-tool, not a global "skip everything": only these change a file, and the policy
+    // guardrail has already denied anything it protects more tightly.
+    approveEdits: (tool) => tool === "edit_file" || tool === "write_file",
+  };
+
   const guardrails: Guardrail[] = [
     // policy first: it is data, and it decides before the code guardrails spend a regex.
     policyGuardrail(policy) as Guardrail,
@@ -109,19 +151,37 @@ export function assembleV2(workspace: Parameters<typeof defaultSections>[0], opt
   };
 
   return {
-    systemPrompt: [...defaultSections(workspace), skillsCatalogSection(), provenanceSection],
+    systemPrompt: [...defaultSections(workspace), skillsCatalogSection(), permissionsSection(policy.mode), provenanceSection],
     tools,
     guardrails,
     listeners: options.audit === false ? [consoleTrace()] : [consoleTrace(), auditListener],
     audit,
     policy,
+    runtime,
   };
 }
 
 /** HARNESS_V2=1 switches this on in the app. Anything else leaves v1 alone. */
 export const v2Enabled = (env: string | undefined): boolean => env === "1" || env === "true";
 
+/** Kept out of policy.ts because it is a plain catalog, not a decision. */
+function listAgentsTool(agents: readonly { name: string; description: string; tools: string[]; maxIterations: number }[]): Tool {
+  return {
+    name: "list_agents",
+    description:
+      "Lists the sub-agents you may delegate to, with the tools each one has. A sub-agent has its own " +
+      "context and budget and returns only a short answer, so delegating keeps what it read out of this conversation.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    execute() {
+      const lines = agents.map(
+        (a) => `- ${a.name}: ${a.description} (tools: ${a.tools.join(", ")}; max ${a.maxIterations} inference calls)`,
+      );
+      return { kind: "success" as const, content: "Sub-agents you can delegate to:\n" + lines.join("\n") };
+    },
+  };
+}
+
 export default defineExtension((ctx) => {
-  const { systemPrompt, tools, guardrails, listeners } = assembleV2(ctx.workspace, { audit: true });
-  return { systemPrompt, tools, guardrails, listeners };
+  const { systemPrompt, tools, guardrails, listeners, runtime } = assembleV2(ctx.workspace, { audit: true });
+  return { systemPrompt, tools, guardrails, listeners, runtime };
 });
