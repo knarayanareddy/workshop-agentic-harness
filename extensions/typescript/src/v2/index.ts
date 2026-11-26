@@ -34,9 +34,8 @@ export interface V2Options {
   /** Compaction threshold in tokens. 0 disables compaction. */
   readonly compactAboveTokens?: number;
   readonly keepLast?: number;
-  /** v2 — offered to the loop. Delegation and acceptEdits both need it; see runtimes below. */
+  /** Set to false to assemble without delegation, for a session that cannot run a sub-agent. */
   readonly delegate?: boolean;
-  readonly subAgentBudgetTokens?: number;
 }
 
 export interface V2Assembly {
@@ -131,7 +130,6 @@ export function assembleV2(workspace: Parameters<typeof defaultSections>[0], opt
     // acceptEdits is per-tool, not a global "skip everything": only these change a file, and the policy
     // guardrail has already denied anything it protects more tightly.
     approveEdits: (tool) => tool === "edit_file" || tool === "write_file",
-    budget: { subAgentTokens: options.subAgentBudgetTokens ?? 60_000 },
   };
 
   const guardrails: Guardrail[] = [

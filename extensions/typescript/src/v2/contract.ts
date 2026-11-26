@@ -60,8 +60,6 @@ export interface AgentRuntimeSpec {
    * an unknown tool would be a bug; the policy guardrail has already run and a DENY wins regardless.
    */
   readonly approveEdits?: (tool: string, input: Record<string, unknown>) => boolean;
-  /** Values the loop checks between iterations: a budget cannot be enforced inside one tool call. */
-  readonly budget?: Readonly<Record<string, number>>;
 }
 
 /** v2 — policy as data. Absent matcher matches anything; deny > ask > allow; layers merge in order. */

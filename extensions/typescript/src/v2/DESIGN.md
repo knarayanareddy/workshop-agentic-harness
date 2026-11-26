@@ -20,7 +20,7 @@ The point of v2 is that most of it needs **no change to the loop**. The four v1 
 | **Scoped approvals** | `ApprovalScope` + `Guardrail.approvalScope` | **yes — `Agent.kt`** |
 | **Delegation / sub-agents** | `AgentRuntime.subAgentRunner` → a nested `Agent` | **`Agent.kt`, `SubAgentLoops.kt`** |
 | **`acceptEdits`** | `AgentRuntime.approveEditsFor`, consulted after every guardrail | **`Agent.kt`** |
-| **A budget that can stop the loop** | `AgentRuntime.interruptCheck`, between iterations | **`Agent.kt`** |
+| **A budget that can stop the loop** | `AgentRuntime.interruptCheck`, between iterations (no bundle sets it yet) | **`Agent.kt`** |
 
 Scoped approvals needed core because v1 recorded `approvedAlways += call.tool.name`: one `a` on
 `run_command` approved every later command in the session (REVIEW C2). A guardrail cannot fix what the
@@ -77,6 +77,10 @@ mode denies writes regardless.
 
 ## Honest limits
 
+- **A per-run token budget is not wired.** `AgentRuntime.interruptCheck` exists and the loop honours it,
+  but nothing in the shipped bundle sets one: the enforced limit today is the child's `maxIterations`.
+  `budgetGuardrail` in `delegation.ts` is the finer-grained version, for a host that attaches it to the
+  child. I removed the `budget` member from the runtime spec rather than ship a knob nothing reads.
 - **A sub-agent starts from a task, not a conversation.** It cannot read the parent's history, so a task
   that says "fix the thing we discussed" fails. That is the trade for isolation, not an oversight.
 - **Delegation needs a model.** Without `MODEL_API_KEY` there is no runner, `ctx.delegate` is not

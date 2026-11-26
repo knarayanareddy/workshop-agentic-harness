@@ -76,11 +76,12 @@ export function delegateTool(agents: readonly SubAgentSpec[] = SUB_AGENTS): Tool
 }
 
 /**
- * Keeps a sub-agent inside its own budget. It is a guardrail on the CHILD, not the parent, because that
- * is where the counter belongs: the loop checks it between iterations with a fresh `TurnContext`.
+ * A guardrail that keeps a sub-agent inside a token budget, for a host that adds it to the child's
+ * guardrail list. The child's iteration budget is the limit the harness enforces today
+ * (`SubAgentSpec.maxIterations`, via `SubAgentLoops`); this is the finer-grained version, and it is a
+ * guardrail rather than a runtime member precisely because it needs nothing from the loop.
  *
- * Costs are estimated with the same chars/4 rule the harness uses, so the number is comparable with the
- * parent's — the comparison is the whole exercise.
+ * Costs use the same chars/4 rule as the harness, so the number compares with the parent's.
  */
 export function budgetGuardrail(limit: number, estimate: (text: string) => number) {
   let spent = 0;

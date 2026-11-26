@@ -129,8 +129,6 @@ export interface AgentRuntimeSpec {
    * guardrails already decided to ASK about, and only when `mode` is `acceptEdits`. A DENY always wins.
    */
   readonly approveEdits?: (tool: string, input: Record<string, unknown>) => boolean;
-  /** Values checked between iterations: a token or call budget cannot be enforced inside one tool call. */
-  readonly budget?: Readonly<Record<string, number>>;
 }
 
 /** `name`: any unique identifier you like; shows up in the trace and labels dynamic sections. */
@@ -226,7 +224,11 @@ export interface Extension {
   tools?: Tool[];
   guardrails?: Guardrail[];
   listeners?: AgentEventListener[];
-  /** v2 — what this bundle needs from the loop (delegation, acceptEdits, a budget). Defaults to v1. */
+  /**
+   * v2 — what this bundle needs from the loop: delegation and acceptEdits. Defaults to v1. There is
+   * deliberately no `budget` member: a per-run budget that the host does not enforce would be a promise
+   * the harness cannot keep, and `budgetGuardrail` (on the child) does the job that is possible today.
+   */
   runtime?: AgentRuntimeSpec;
 }
 
