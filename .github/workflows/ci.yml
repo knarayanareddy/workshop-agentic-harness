@@ -144,11 +144,23 @@ jobs:
         run: |
           set -eu
           api="https://api.github.com/repos/OpenRA/OpenRA"
-          code=$(curl -sS -o /dev/null -w '%{http_code}' "$api/commits/$OPENRA_PIN")
-          echo "commit $OPENRA_PIN -> HTTP $code"
+          # Unauthenticated requests are rate limited per IP, and shared runner IPs hit 403/429
+          # intermittently. Use the token, and retry: a flaky check is worse than none.
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          code=""
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o /tmp/commit.json -w '%{http_code}' "${auth[@]}" "$api/commits/$OPENRA_PIN") || code="000"
+            echo "attempt $attempt: commit $OPENRA_PIN -> HTTP $code"
+            [ "$code" = "200" ] && break
+            sleep $((attempt * 3))
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::cannot confirm the pinned commit (HTTP $code). This is usually rate limiting, not a missing commit."
+            head -c 300 /tmp/commit.json || true
+          fi
           test "$code" = "200"
           # The whole point of pinning here: upstream forbids agentic use from 2026-10-28 onward.
-          agents=$(curl -sS -o /dev/null -w '%{http_code}' "$api/contents/AGENTS.md?ref=$OPENRA_PIN")
+          agents=$(curl -sS -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/contents/AGENTS.md?ref=$OPENRA_PIN")
           echo "AGENTS.md at pin -> HTTP $agents (expect 404)"
           test "$agents" = "404"
       - name: Pin in prototype and worksheet agree
@@ -167,6 +179,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          curl -sS "https://api.github.com/repos/OpenRA/OpenRA/contents/Directory.Build.props?ref=$OPENRA_PIN" \
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/OpenRA/OpenRA/contents/Directory.Build.props?ref=$OPENRA_PIN" \
             | python3 -c 'import json,sys,base64; t=base64.b64decode(json.load(sys.stdin)["content"]).decode(); sys.exit(0 if "<TargetFramework>net10.0</TargetFramework>" in t else "not net10.0: "+t[:200])'
           echo "net10.0 confirmed"
