@@ -135,9 +135,17 @@ export function compaction(o: CompactionOptions) {
 // ---- audit ---------------------------------------------------------------------------------------
 
 /**
- * cyrb53: a fast, non-cryptographic 53-bit hash. Used to CHAIN entries so a modified or reordered
- * entry is detectable. It is deliberately not presented as tamper-PROOF: anyone who can rewrite the
- * whole chain can recompute it. That distinction is the honest one.
+ * cyrb53: a fast, non-cryptographic 53-bit hash. Used to CHAIN entries so that an edit, a reorder, or a
+ * deletion from the middle or the end is detectable, using nothing but the log itself.
+ *
+ * What it is NOT, and the reason this chain is not evidence: the hash is public and keyless, so anyone
+ * who can rewrite an entry can recompute every later hash with this same function. A test proves exactly
+ * that (see `a rewritten chain verifies clean`): a forged log passes `verify()`.
+ *
+ * The real objection is upstream of the algorithm. Within one process only this code writes the log, so
+ * there is no attacker to detect; and an attacker who can forge the log can equally skip the append. A
+ * chain becomes evidence only when someone else witnesses its head, or when the head is committed
+ * somewhere the writer cannot rewrite. Adding SHA-256 would not change that.
  */
 export function cyrb53(str: string, seed = 0): string {
   let h1 = 0xdeadbeef ^ seed;
