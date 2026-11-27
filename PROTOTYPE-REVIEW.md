@@ -571,3 +571,34 @@ confused for the client, reversed scripted sequences, and a `'x'` where Kotlin n
 
 The JUnit annotation added in Part 5 paid for itself: every one of those arrived as the failing test's
 name and assertion message, not as "exit code 1".
+
+## Correction: "the audit hash isn't cryptographic" was the least interesting part
+
+Asked why, and the honest answer is that the algorithm is the smallest problem. Recorded here because the
+review claimed more than it could support, twice, and in the same sentence:
+
+**What was claimed.** "The audit chain is not tamper-proof" — with, as the only reason, that `cyrb53` is not
+cryptographic.
+
+**What is actually true.** A test now demonstrates it (`a rewritten chain verifies clean`): delete an
+entry, recompute the remaining hashes with the same public function, and `verify()` returns `ok: true`, with
+the write silently gone from the record.
+
+**Why the algorithm was the wrong diagnosis.** Swapping `cyrb53` for SHA-256 would not change the outcome:
+
+1. A hash chain is a **keyless** construction. Anyone who can write the log can also compute its hashes.
+   There is no secret to make the forger's job harder.
+2. Within one process there is no attacker: only the harness appends. So there is nothing to detect.
+3. An attacker who can rewrite the log can equally skip the append, or the run.
+
+A chain becomes evidence at exactly the point where its **head is witnessed by someone else** (a signature
+with a key the writer lacks, a copy the writer cannot reach, a commit to an append-only log). None of those
+is wired here.
+
+**The claim that should have been made:** the log is an integrity check against accident and a careless
+hand — edits, reorders, deletions from the middle and the end, all detectable using nothing but the log. It
+is not evidence against a forger, and it is in memory only, so it does not survive the session.
+
+`DESIGN.md` and the code comment on `cyrb53` now say this. The test is deliberately written so that it
+still passes if someone swaps in SHA-256: if it started failing, the design would have changed, not the
+hash.

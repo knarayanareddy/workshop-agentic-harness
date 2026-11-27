@@ -173,6 +173,37 @@ describe("audit log", () => {
     expect(cyrb53("a", 7)).not.toBe(cyrb53("a"));
   });
 
+  /**
+   * The limit, pinned as a test rather than a sentence in a doc. If someone later "fixes" the audit log by
+   * swapping in SHA-256, this test still passes, because the weakness is not the hash function: the hash
+   * is public and keyless, so anyone who rewrites an entry recomputes every later one. The point of this
+   * test is that `verify()` is an integrity check against ACCIDENT, not evidence against a forger.
+   */
+  it("a rewritten chain verifies clean: the log is not evidence against a forger", () => {
+    const log = new AuditLog();
+    log.add("approval", "run_command: git push -> denied");
+    log.add("tool_call", "write_file OpenRA/mods/ra/rules/x.yaml");
+    log.add("approval", "run_command: git commit -> approved");
+    expect(log.verify().ok).toBe(true);
+
+    // Delete the write, then recompute the remaining entries with the SAME public function.
+    const kept = [log.all[0]!, log.all[2]!].map((e, i) => ({ ...e, n: i + 1 }));
+    let prev = "genesis";
+    for (const e of kept) {
+      e.prev = prev;
+      e.hash = cyrb53(`${e.n}|${e.kind}|${e.summary}|${e.prev}`);
+      prev = e.hash;
+    }
+    const forged = Object.assign(Object.create(AuditLog.prototype), { entries: kept, issued: kept.length, seed: "genesis" }) as AuditLog;
+
+    // This is the finding, not a bug to fix: nothing inside the log can tell the difference.
+    expect(forged.verify().ok).toBe(true);
+    expect(forged.all.map((e) => e.summary)).toEqual([
+      "run_command: git push -> denied",
+      "run_command: git commit -> approved",
+    ]);
+  });
+
   it("records what matters and skips the noisy defaults", () => {
     expect(auditEntryFor({ type: "tool_call_proposed", toolName: "read_file" })!.kind).toBe("tool_proposed");
     expect(auditEntryFor({ type: "turn_started", userMessage: "hi" })!.summary).toContain("hi");

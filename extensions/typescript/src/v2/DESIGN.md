@@ -90,9 +90,19 @@ mode denies writes regardless.
   something surprising, and it is not a syscall boundary.
 - **Compaction is lossy by construction** and it restarts the prompt cache; the loop emits its own
   warning when a guardrail rewrites history, and that warning is correct.
-- **The audit chain is not tamper-proof.** `cyrb53` is not cryptographic; anyone who can rewrite every
-  entry can recompute the chain. It detects accidental edits and naive tampering, which is what it
-  claims. It detects removals from the middle *and* the end, which a bare chain cannot.
+- **The audit log is an integrity check, not evidence.** The hash chain detects an edit, a reorder, or a
+  deletion from the middle or the end — using nothing but the log. That is worth having against accident
+  and against a careless hand. It is **not** evidence against a determined one, and the reason is not
+  really the hash function:
+  - `cyrb53` is public and keyless, so a forger recomputes every later hash. A test proves it: a log with
+    an entry deleted and the chain rewritten passes `verify()` (`a rewritten chain verifies clean`).
+  - Swapping in SHA-256 would not fix that. The log is only ever appended to inside one process, so
+    there is no attacker to detect; and anyone who can rewrite the log can equally skip the append.
+  - A chain becomes evidence only when its head is witnessed by someone else, or committed where the
+    writer cannot rewrite it. Neither is wired here, and that is the honest boundary of the claim.
+  - It is also **in memory only**: the log never leaves the JS heap, so it is not a record of the session
+    that survives it. The `/report` page records what happened, but it is written by the harness, not
+    inside the tamper-evident chain.
 - **Skills are seed data.** Two skills ship as examples; they are not a complete catalogue of OpenRA
   knowledge, and the model must choose to load them.
 
